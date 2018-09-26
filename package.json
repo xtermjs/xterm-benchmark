@@ -1,0 +1,22 @@
+{
+  "name": "xterm-benchmark",
+  "version": "0.1.0",
+  "description": "A benchmark tool for measuring performance in xterm.js",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xtermjs/xterm-benchmark.git"
+  },
+  "author": "The xterm.js authors",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/xtermjs/xterm-benchmark/issues"
+  },
+  "homepage": "https://github.com/xtermjs/xterm-benchmark#readme",
+  "dependencies": {
+    "chrome-timeline": "https://github.com/xtermjs/chrome-timeline#master"
+  }
+}
