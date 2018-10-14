@@ -5,12 +5,13 @@ const perfContext = require('../lib/index').perfContext;
 const timeit = require('../lib/index').timeit;
 const before = require('../lib/index').before;
 const beforeEach = require('../lib/index').beforeEach;
+const throughput = require('../lib/index').throughput;
 
 perfContext('Parser performance - 50MB data', () => {
   let content;
   let parser;
 
-  beforeEach('', () => {
+  beforeEach(() => {
     parser = new EscapeSequenceParser();
     parser.setPrintHandler((data, start, end) => {});
     parser.setCsiHandler('@', (params, collect) => {});
@@ -82,146 +83,106 @@ perfContext('Parser performance - 50MB data', () => {
   });
 
   perfContext('print - a', () => {
-    before('', () => {
+    before(() => {
       let data = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
       content = '';
       while (content.length < 50000000)  // test with +50MB
         content += data;
     });
-    timeit('throughput', () => {
-      let start = new Date();
+    throughput('throughput', async () => {
       parser.parse(content);
-      let duration = (new Date()) - (start);
-      console.log({
-        Throughput: Number(1000/duration*content.length/1024/1024).toFixed(2) + ' MB/s',
-        duration
-      });
-    }, {isolated: true});
+      return content.length;
+    }, {fork: true}).showThroughput();
   });
 
   perfContext('execute - \\n', () => {
-    before('', () => {
+    before(() => {
       let data = '\n\n\n\n\n\n\n';
       content = '';
       while (content.length < 50000000)  // test with +50MB
         content += data;
     });
-    timeit('throughput', () => {
-      let start = new Date();
+    throughput('throughput', () => {
       parser.parse(content);
-      let duration = (new Date()) - (start);
-      console.log({
-        Throughput: Number(1000/duration*content.length/1024/1024).toFixed(2) + ' MB/s',
-        duration
-      });
-    }, {isolated: true});
+      return content.length;
+    }, {fork: true}).showThroughput();
   });
 
   perfContext('escape - ESC E', () => {
-    before('', () => {
+    before(() => {
       let data = '\x1bE';
       content = '';
       while (content.length < 50000000)  // test with +50MB
         content += data;
     });
-    timeit('throughput', () => {
-      let start = new Date();
+    throughput('throughput', () => {
       parser.parse(content);
-      let duration = (new Date()) - (start);
-      console.log({
-        Throughput: Number(1000/duration*content.length/1024/1024).toFixed(2) + ' MB/s',
-        duration
-      });
-    }, {isolated: true});
+      return content.length;
+    }, {fork: true}).showThroughput();
   });
 
   perfContext('escape with collect - ESC % G', () => {
-    before('', () => {
+    before(() => {
       let data = '\x1b%G';
       content = '';
       while (content.length < 50000000)  // test with +50MB
         content += data;
     });
-    timeit('throughput', () => {
-      let start = new Date();
+    throughput('throughput', () => {
       parser.parse(content);
-      let duration = (new Date()) - (start);
-      console.log({
-        Throughput: Number(1000/duration*content.length/1024/1024).toFixed(2) + ' MB/s',
-        duration
-      });
-    }, {isolated: true});
+      return content.length;
+    }, {fork: true}).showThroughput();
   });
 
   perfContext('simple csi - CSI A', () => {
-    before('', () => {
+    before(() => {
       let data = '\x1b[A';
       content = '';
       while (content.length < 50000000)  // test with +50MB
         content += data;
     });
-    timeit('throughput', () => {
-      let start = new Date();
+    throughput('throughput', () => {
       parser.parse(content);
-      let duration = (new Date()) - (start);
-      console.log({
-        Throughput: Number(1000/duration*content.length/1024/1024).toFixed(2) + ' MB/s',
-        duration
-      });
-    }, {isolated: true});
+      return content.length;
+    }, {fork: true}).showThroughput();
   });
 
   perfContext('csi with collect - CSI ? p', () => {
-    before('', () => {
+    before(() => {
       let data = '\x1b[?p';
       content = '';
       while (content.length < 50000000)  // test with +50MB
         content += data;
     });
-    timeit('throughput', () => {
-      let start = new Date();
+    throughput('throughput', () => {
       parser.parse(content);
-      let duration = (new Date()) - (start);
-      console.log({
-        Throughput: Number(1000/duration*content.length/1024/1024).toFixed(2) + ' MB/s',
-        duration
-      });
-    }, {isolated: true});
+      return content.length;
+    }, {fork: true}).showThroughput();
   });
 
   perfContext('csi with params - CSI 1;2 m', () => {
-    before('', () => {
+    before(() => {
       let data = '\x1b{1;2m';
       content = '';
       while (content.length < 50000000)  // test with +50MB
         content += data;
     });
-    timeit('throughput', () => {
-      let start = new Date();
+    throughput('throughput', () => {
       parser.parse(content);
-      let duration = (new Date()) - (start);
-      console.log({
-        Throughput: Number(1000/duration*content.length/1024/1024).toFixed(2) + ' MB/s',
-        duration
-      });
-    }, {isolated: true});
+      return content.length;
+    }, {fork: true}).showThroughput();
   });
 
   perfContext('osc - OSC 0;hi ST', () => {
-    before('', () => {
+    before(() => {
       let data = '\x1b]0;hi\x1b\'';
       content = '';
       while (content.length < 50000000)  // test with +50MB
         content += data;
     });
-    timeit('throughput', () => {
-      let start = new Date();
+    throughput('throughput', () => {
       parser.parse(content);
-      let duration = (new Date()) - (start);
-      console.log({
-        Throughput: Number(1000/duration*content.length/1024/1024).toFixed(2) + ' MB/s',
-        duration
-      });
-    }, {isolated: true});
+      return content.length;
+    }, {fork: true}).showThroughput();
   });
 });
