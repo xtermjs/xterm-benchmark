@@ -1,75 +1,52 @@
 /**
  * TODO:
  *    - timeout option
+ *    - json option not working anymore
  *    - include timeline
- *    - refactor stack/tokens
- *        - make sub stacks local
- *        - separate primitives from context and case
- *        - separate options
- *    - remove globals
- *    - custom logformat
+ *    - remove global CMDLINE_OVERRIDE
  *    - async error handling/propagation
  *    - test cases
  *    - git integration mixin
  */
 
-interface IPerfOptions {
-  fork: boolean;
-  forkArgs?: string[];
-  forkOptions?: any;
-  timeout?: number;
-  repeat: number;
-}
-
-export interface ICmdlineOverrides {
-  repeat?: number;
-  timeout?: number;
-}
-
-interface IStackToken {
-  type: PerfType;
-  options: IPerfOptions;
-  name: string;
-  callback(): void;
-  instance?: PerfCase;
-}
-
-interface ICaseResult {
-  name: string;
-  path: string[];
-  runtime: number[] | undefined;
-  returnValue: any;
-  run: number;
-  repeat: number;
-  error?: any;
-}
-
-interface IPerfTree {
-  name: string;
-  type: PerfType;
-  path: string;
-  children?: IPerfTree[];
-}
-
-const enum PerfType {
-  perfContext,
-  perfCase,
-  before,
-  beforeEach,
-  after,
-  afterEach
-}
-
+import { IPerfOptions, ICmdlineOverrides, IStackToken, PerfType, IPerfTree, IPerfCase, ICaseResult } from './interfaces';
 import * as path from 'path';
 import { fork } from 'child_process';
+import { Runtime, Throughput } from './mixins';
+
 
 const DEFAULT_OPTIONS: IPerfOptions = {
   fork: false,
   repeat: 1
 };
+export const CMDLINE_OVERRIDES: ICmdlineOverrides = {}; // FIXME: get rid of export
+const INDENT = '   ';
 
-function _logformat(result: ICaseResult, run: number): string {
-  return `${result.name} : ${run} - ${result.runtime[1] / 1000000 + result.runtime[0] * 1000}ms ${result.returnValue}`;
+/**
+ * Global symbol stack.
+ * This is used to load the symbols for the next context:
+ *    - enclosing callback triggers exported symbols functions which add itself to the stack
+ *    - PerfContext.constructor consumes the symbols (empties stack)
+ *    - PerfContext.run calls symbols callbacks, which either:
+ *        - enclose a child context -> spawn new context
+ *        - trigger a perf cases
+ *        - do some before/after work
+ * Never change the underlying object, always pop from the original.
+ */
+const STACK: IStackToken[] = [];
+
+function addToStack(token: IStackToken): void {
+  // we dont rely on unique names, but need identity for contexts and cases
+  // therefore we fix names by appending an incrementing number
+  if (token.type === PerfType.Context || token.type === PerfType.PerfCase) {
+    const stackNames = STACK.map(el => el.name);
+    if (stackNames.indexOf(token.name) !== -1) {
+      let num = 0;
+      while (stackNames.indexOf(token.name + '#' + ++num) !== -1);
+      token.name += '#' + num;
+    }
+  }
+  STACK.push(token);
 }
 
 /**
@@ -98,10 +75,10 @@ function _logformat(result: ICaseResult, run: number): string {
  * on state changes from neighbors (simply dont do it).
  */
 class PerfContext {
-  public before: () => void = () => {};
-  public beforeEach: () => void = () => {};
-  public after: () => void = () => {};
-  public afterEach: () => void = () => {};
+  public before: () => void = () => { };
+  public beforeEach: () => void = () => { };
+  public after: () => void = () => { };
+  public afterEach: () => void = () => { };
   // to preserve invocation order we put runners and sub contexts in just one list
   // and do the further tree expanding lazy in .run
   public contextsOrCases: IStackToken[] = [];
@@ -124,10 +101,10 @@ class PerfContext {
         case PerfType.afterEach:
           this.afterEach = entry.callback;
           break;
-        case PerfType.perfContext:
+        case PerfType.Context:
           this.contextsOrCases.push(entry);
           break;
-        case PerfType.perfCase:
+        case PerfType.PerfCase:
           this.contextsOrCases.push(entry);
           break;
         default:
@@ -136,10 +113,10 @@ class PerfContext {
   }
 
   public getPath(): string[] {
-    let parents = [];
+    let parents: string[] = [];
     let elem = this.parent;
     while (elem) {
-      parents.splice(0, 0, elem.name);
+      parents.unshift(elem.name);
       elem = elem.parent;
     }
     parents.push(this.name);
@@ -155,17 +132,17 @@ class PerfContext {
   }
 
   public async runFull(): Promise<void> {
-    console.log(`\nRunning ${this.name}:`);
+    console.log(`${INDENT.repeat(this.getPath().length)}Context "${this.name}"`);
     await this.before();
     for (let i = 0; i < this.contextsOrCases.length; ++i) {
       await this.beforeEach();
-      if (this.contextsOrCases[i].type === PerfType.perfContext) {
-        while (STACK.pop()) {}
+      if (this.contextsOrCases[i].type === PerfType.Context) {
+        while (STACK.pop()) { }
         await this.contextsOrCases[i].callback();
         const ctx = new PerfContext(this.contextsOrCases[i].name, this);
         await ctx.runFull();
       } else {
-        await this.contextsOrCases[i].instance.run(this);
+        await (this.contextsOrCases[i] as PerfCase).run(this.getPath());
       }
       await this.afterEach();
     }
@@ -177,17 +154,20 @@ class PerfContext {
     if (!needle) {
       return this.runFull();
     }
+    if (!forked) {
+      console.log(`${INDENT.repeat(this.getPath().length)}Context "${this.name}"`);
+    }
     await this.before();
     for (let i = 0; i < this.contextsOrCases.length; ++i) {
       if (this.contextsOrCases[i].name === needle) {
         await this.beforeEach();
-        if (this.contextsOrCases[i].type === PerfType.perfContext) {
-          while (STACK.pop()) {}
+        if (this.contextsOrCases[i].type === PerfType.Context) {
+          while (STACK.pop()) { }
           this.contextsOrCases[i].callback();
           const ctx = new PerfContext(this.contextsOrCases[i].name, this);
           await ctx.runSingle(treePath, forked);
         } else {
-          await this.contextsOrCases[i].instance.run(this, forked);
+          await (this.contextsOrCases[i] as PerfCase).run(this.getPath(), forked);
         }
         await this.afterEach();
         await this.after();
@@ -205,18 +185,18 @@ class PerfContext {
     const path = this.getPathString();
     return {
       name: this.name,
-      type: PerfType.perfContext,
+      type: PerfType[PerfType.Context],
       path: path,
       children: this.contextsOrCases.map(el => {
-        if (el.type === PerfType.perfContext) {
-          while (STACK.pop()) {}
+        if (el.type === PerfType.Context) {
+          while (STACK.pop()) { }
           el.callback();
           const ctx = new PerfContext(el.name, this);
           return ctx.getTree();
         } else {
           return {
             name: el.name,
-            type: PerfType.perfCase,
+            type: PerfType[PerfType.PerfCase],
             path: path + '|' + el.name
           };
         }
@@ -228,50 +208,53 @@ class PerfContext {
 /**
  * PerfCase
  * Base class for performance cases.
- * Comes with the convenient methods `showRuntime` and `showAverageRuntime`.
  */
-class PerfCase {
-  public single: ((result: ICaseResult) => ICaseResult | void)[] = [];
-  public all: ((result: ICaseResult[]) => ICaseResult[] | void)[] = [];
+export class PerfCase implements IPerfCase {
+  public type: PerfType = PerfType.PerfCase;
+  private _single: ((result: ICaseResult) => ICaseResult | void)[] = [];
+  private _all: ((result: ICaseResult[]) => ICaseResult[] | void)[] = [];
   public options: IPerfOptions;
   public results: ICaseResult[] = [];
-  constructor(public name: string, public callback: () => void, opts: IPerfOptions) {
-    // FIXME: name must be changed here!!!!!! + refactor stack abstraction
+  public summary: { [key: string]: any } = {};
+  public path: string[] | null = null;
+  constructor(public name: string, public callback: () => void, opts?: IPerfOptions) {
     this.options = Object.assign({}, DEFAULT_OPTIONS, opts, CMDLINE_OVERRIDES);
-    const stackToken: IStackToken = {type: PerfType.perfCase, options: this.options, name, callback, instance: this};
-    addToStack(stackToken, true);
-    this.name = stackToken.name;
+    addToStack(this);
   }
-  public postEach(callback: (result: ICaseResult) => ICaseResult | void): PerfCase {
-    this.single.push(callback);
+  public postEach(callback: (result: ICaseResult) => ICaseResult | void): this {
+    this._single.push(callback);
     return this;
   }
-  public postAll(callback: (results: ICaseResult[]) => ICaseResult[] | void): PerfCase  {
-    this.all.push(callback);
+  public postAll(callback: (results: ICaseResult[]) => ICaseResult[] | void): this {
+    this._all.push(callback);
     return this;
   }
-  private _processSingle(result: ICaseResult): void {
-    for (let i = 0; i < this.single.length; ++i) {
-      const altered = this.single[i](result);
+  private async _processSingle(result: ICaseResult): Promise<void> {
+    for (let i = 0; i < this._single.length; ++i) {
+      const altered = await this._single[i](result);
+      if (altered === null) {
+        return;
+      }
       if (altered && altered !== result) {
         result = altered;
       }
     }
     this.results.push(result);
   }
-  private _processFinal(): void {
-    for (let i = 0; i < this.all.length; ++i) {
-      const altered = this.all[i](this.results);
+  private async _processFinal(): Promise<void> {
+    for (let i = 0; i < this._all.length; ++i) {
+      const altered = await this._all[i](this.results);
       if (altered && altered !== this.results) {
         this.results = altered;
       }
     }
   }
-  public async run(ctx: PerfContext, forked: boolean = false): Promise<void> {
+  public async run(parentPath: string[], forked: boolean = false): Promise<void> {
     // TODO: timeout
+    this.path = parentPath.concat(this.name);
     if (this.options.fork && !forked) {
-      const p = fork(path.join(module.filename), this.options.forkArgs, this.options.forkOptions);
-      p.send({case: ctx.getPath().concat(this.name), cmdlineOverrides: CMDLINE_OVERRIDES});
+      const p = fork(path.join(module.filename), this.options.forkArgs || [], this.options.forkOptions);
+      p.send({ case: this.path, cmdlineOverrides: CMDLINE_OVERRIDES });
       await new Promise(resolve => {
         p.on('message', (result: ICaseResult) => this._processSingle(result));
         p.on('exit', _ => resolve());
@@ -283,124 +266,34 @@ class PerfCase {
         const runtime = process.hrtime(start);
         const result: ICaseResult = {
           name: this.name,
-          path: ctx.getPath(),
+          path: this.path,
           runtime,
           returnValue,
           run: repeat + 1,
           repeat: this.options.repeat
-        }
+        };
         if (forked) {
           process.send(result);
         } else {
-          this._processSingle(result);
+          await this._processSingle(result);
         }
       }
     }
     if (!forked) {
-      this._processFinal();
+      await this._processFinal();
     }
   }
-}
-
-/**
- * Defaults mixins for PerfCase
- */
-type PerfCaseConstructor<T = PerfCase> = new(...args: any[]) => T;
-
-interface ICaseResultThroughput extends ICaseResult {
-  throughput: number;
-}
-
-// report runtime
-const MixinRuntime = function<TBase extends PerfCaseConstructor>(Base: TBase) {
-  return class extends Base {
-    public showRuntime(): PerfCase {
-      this.single.push((result: ICaseResult): ICaseResult => {
-        console.log(_logformat(result, result.run));
-        return result;
-      });
-      return this;
-    }
-    public showAverageRuntime(): PerfCase  {
-      this.all.push((results: ICaseResult[]): void => {
-        let average = 0;
-        for (let i = 0; i < results.length; ++i) {
-          const result = results[i];
-          average += (result.runtime[1] / 1000000 + result.runtime[0] * 1000);
-        }
-        console.log(`average over ${results.length} runs: ${average/results.length}ms`);
-      });
-      return this;
-    }
-  };
-}
-
-// report throughput
-const MixinThroughput = function<TBase extends PerfCaseConstructor>(Base: TBase) {
-  return class extends Base {
-    public throughput(): PerfCase {
-      this.single.push((result: ICaseResult): void => {
-        const msec = result.runtime[1] / 1000000 + result.runtime[0] * 1000;
-        (result as ICaseResultThroughput).throughput = 1000 / msec * result.returnValue / 1024 / 1024;
-      });
-      return this;
-    }
-    public showThroughput(): PerfCase {
-      this.single.push((result: ICaseResultThroughput): void => {
-        console.log(`${this.name} : ${result.run} - Throughput: ${Number(result.throughput).toFixed(2)} MB/s`);
-      });
-      return this;
-    }
-    public showAverageThroughput(): PerfCase {
-      this.all.push((results: ICaseResultThroughput[]): void => {
-        let average = 0;
-        for (let i = 0; i < results.length; ++i) {
-          average += results[i].throughput;
-        }
-        console.log(`${this.name} : Average throughput: ${Number(average / results.length).toFixed(2)} MB/s`);
-      });
-      return this;
-    }
-  };
-}
-
-// TODO: chrome-timeline perf case
-
-/**
- * Global symbol stack.
- * This is used to load the symbols for the next context:
- *    - enclosing callback triggers exported symbols functions which add itself to the stack
- *    - PerfContext.constructor consumes the symbols (empties stack)
- *    - PerfContext.run calls symbols callbacks, which either:
- *        - enclose a child context -> spawn new context
- *        - trigger a perf cases
- *        - do some before/after work
- * Never change the underlying object, always pop from the original.
- */
-const STACK: IStackToken[] = [];
-
-function addToStack(token: IStackToken, enumNames: boolean = false): void {
-  // we dont rely on unique names, but need identity for contexts and cases
-  // therefore we fix names by appending an incrementing number
-  if (enumNames) {
-    const stackNames = STACK.map(el => el.name);
-    if (stackNames.indexOf(token.name) !== -1) {
-      let num = 0;
-      while (stackNames.indexOf(token.name + '#' + ++num) !== -1);
-      token.name += '#' + num;
-    }
+  public getIndent(): string {
+    return INDENT.repeat(this.path.length);
   }
-  STACK.push(token);
 }
-
-export const CMDLINE_OVERRIDES: ICmdlineOverrides = {};
 
 /**
  * Called once after entering a context.
  * Also applies to top level (a top level `before` will run when the file is entered).
  */
 export function before(callback: () => void): void {
-  addToStack({type: PerfType.before, options: DEFAULT_OPTIONS, name: '', callback});
+  addToStack({ type: PerfType.before, name: '', callback });
 }
 
 /**
@@ -408,7 +301,7 @@ export function before(callback: () => void): void {
  * Also applies to top level.
  */
 export function beforeEach(callback: () => void): void {
-  addToStack({type: PerfType.beforeEach, options: DEFAULT_OPTIONS, name: '', callback});
+  addToStack({ type: PerfType.beforeEach, name: '', callback });
 }
 
 /**
@@ -416,7 +309,7 @@ export function beforeEach(callback: () => void): void {
  * Also applies to top level.
  */
 export function after(callback: () => void): void {
-  addToStack({type: PerfType.after, options: DEFAULT_OPTIONS, name: '', callback});
+  addToStack({ type: PerfType.after, name: '', callback });
 }
 
 /**
@@ -424,42 +317,43 @@ export function after(callback: () => void): void {
  * Also applies to top level.
  */
 export function afterEach(callback: () => void): void {
-  addToStack({type: PerfType.afterEach, options: DEFAULT_OPTIONS, name: '', callback});
+  addToStack({ type: PerfType.afterEach, name: '', callback });
 }
 
 /**
  * Spawn a new perf context.
  */
 export function perfContext(name: string, callback: () => void): void {
-  addToStack({type: PerfType.perfContext, options: DEFAULT_OPTIONS, name, callback}, true);
+  addToStack({ type: PerfType.Context, name, callback });
 }
 
 /**
- * Simple runtime measuring perf case.
+ * Some default ctors and types.
  */
-export function timeit(name: string, callback: () => void, opts?: IPerfOptions): PerfCase {
-  return new (MixinRuntime(PerfCase))(name, callback, opts);
-}
+export const RuntimeCase = Runtime(PerfCase);
+export type RuntimeCaseType = InstanceType<typeof RuntimeCase>;
+
+export const ThroughputRuntimeCase = Throughput(Runtime(PerfCase));
+export type ThroughputRuntimeCaseType = InstanceType<typeof ThroughputRuntimeCase>;
+
 
 /**
- * Simple throughput measuring.
- * Expects the payload in bytes as return value.
+ * Run context tree path.
+ * Main entry for the cli.
  */
-export function throughput(name: string, callback: () => void, opts?: IPerfOptions): PerfCase {
-  return new (MixinThroughput(MixinRuntime(PerfCase)))(name, callback, opts).throughput();
-}
-
-
 export async function run(treePath: string[]): Promise<void> {
-  while (STACK.pop()) {}
-  //try {
-    const filename = treePath.shift();
-    require(path.resolve(filename));
-    const ctx = new PerfContext(filename, null);
-    await ctx.runSingle(treePath);
-  //} catch (e) {} // TODO: handle error
+  while (STACK.pop()) { }
+  // try {
+  const filename = treePath.shift();
+  require(path.resolve(filename));
+  const ctx = new PerfContext(filename, null);
+  await ctx.runSingle(treePath);
+  // } catch (e) {} // TODO: handle error
 }
 
+/**
+ * Log context tree to console.
+ */
 export function showTree(filename: string): void {
   try {
     require(path.resolve(filename));

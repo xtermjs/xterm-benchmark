@@ -7,7 +7,7 @@
     "test": "mocha lib/*.test.js",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "tslint src/**/*.ts"
+    "lint": "tslint 'src/**/*.ts'"
   },
   "repository": {
     "type": "git",

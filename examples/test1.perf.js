@@ -1,10 +1,12 @@
-const timeit = require('../lib/index').timeit;
+const RuntimeCase = require('../lib/index').RuntimeCase;
 const before = require('../lib/index').before;
 const beforeEach = require('../lib/index').beforeEach;
 const after = require('../lib/index').after;
 const afterEach = require('../lib/index').afterEach;
 const perfContext = require('../lib/index').perfContext;
-const throughput = require('../lib/index').throughput;
+const ThroughputRuntimeCase = require('../lib/index').ThroughputRuntimeCase;
+const PerfCase = require('../lib/index').PerfCase;
+const mixins = require('../lib/mixins');
 
 
 let a = 'grrrr';
@@ -26,7 +28,7 @@ afterEach(() => {
   console.log('afterEach - file level');
 });
 
-timeit('Hello World - file level', () => {
+new RuntimeCase('Hello World - file level', () => {
   const values = [];
   for (i = 0; i < 100000; ++i) {
     values.push(i);
@@ -54,7 +56,7 @@ perfContext('ctx1', () => {
     console.log('afterEach - ctx1');
   });
   
-  timeit('Hello World - ctx1', () => {
+  new RuntimeCase('Hello World - ctx1', () => {
     const values = [];
     for (i = 0; i < 1000000; ++i) {
       values.push(i);
@@ -66,7 +68,7 @@ perfContext('ctx1', () => {
 
   });
 
-  throughput('yeah throughput', () => {
+  new ThroughputRuntimeCase('yeah throughput', () => {
     const s = 'a'.repeat(100000);
     const values = [];
     for (i = 0; i < s.length; ++i) {
@@ -76,3 +78,9 @@ perfContext('ctx1', () => {
   }, {repeat: 10}).showRuntime().showAverageRuntime().showThroughput().showAverageThroughput();
 });
 
+
+const Mixed = mixins.Throughput(mixins.Runtime(PerfCase));
+new Mixed('mixins in JS', () => {
+  console.log('works?');
+  return {payloadSize: 1000000};
+}).showAverageRuntime().showAverageThroughput();

@@ -2,10 +2,9 @@ const EscapeSequenceParser = require('xterm/lib/EscapeSequenceParser').EscapeSeq
 const C0 = require('xterm/lib/common/data/EscapeSequences').C0;
 const C1 = require('xterm/lib/common/data/EscapeSequences').C1;
 const perfContext = require('../lib/index').perfContext;
-const timeit = require('../lib/index').timeit;
 const before = require('../lib/index').before;
 const beforeEach = require('../lib/index').beforeEach;
-const throughput = require('../lib/index').throughput;
+const ThroughputRuntimeCase = require('../lib/index').ThroughputRuntimeCase;
 
 perfContext('Parser performance - 50MB data', () => {
   let content;
@@ -89,10 +88,10 @@ perfContext('Parser performance - 50MB data', () => {
       while (content.length < 50000000)  // test with +50MB
         content += data;
     });
-    throughput('throughput', async () => {
+    new ThroughputRuntimeCase('throughput', async () => {
       parser.parse(content);
-      return content.length;
-    }, {fork: true}).showThroughput();
+      return {payloadSize: content.length};
+    }, {fork: false, forkArgs: ['--prof']}).showThroughput();
   });
 
   perfContext('execute - \\n', () => {
@@ -102,9 +101,9 @@ perfContext('Parser performance - 50MB data', () => {
       while (content.length < 50000000)  // test with +50MB
         content += data;
     });
-    throughput('throughput', () => {
+    new ThroughputRuntimeCase('throughput', () => {
       parser.parse(content);
-      return content.length;
+      return {payloadSize: content.length};
     }, {fork: true}).showThroughput();
   });
 
@@ -115,9 +114,9 @@ perfContext('Parser performance - 50MB data', () => {
       while (content.length < 50000000)  // test with +50MB
         content += data;
     });
-    throughput('throughput', () => {
+    new ThroughputRuntimeCase('throughput', () => {
       parser.parse(content);
-      return content.length;
+      return {payloadSize: content.length};
     }, {fork: true}).showThroughput();
   });
 
@@ -128,9 +127,9 @@ perfContext('Parser performance - 50MB data', () => {
       while (content.length < 50000000)  // test with +50MB
         content += data;
     });
-    throughput('throughput', () => {
+    new ThroughputRuntimeCase('throughput', () => {
       parser.parse(content);
-      return content.length;
+      return {payloadSize: content.length};
     }, {fork: true}).showThroughput();
   });
 
@@ -141,9 +140,9 @@ perfContext('Parser performance - 50MB data', () => {
       while (content.length < 50000000)  // test with +50MB
         content += data;
     });
-    throughput('throughput', () => {
+    new ThroughputRuntimeCase('throughput', () => {
       parser.parse(content);
-      return content.length;
+      return {payloadSize: content.length};
     }, {fork: true}).showThroughput();
   });
 
@@ -154,9 +153,9 @@ perfContext('Parser performance - 50MB data', () => {
       while (content.length < 50000000)  // test with +50MB
         content += data;
     });
-    throughput('throughput', () => {
+    new ThroughputRuntimeCase('throughput', () => {
       parser.parse(content);
-      return content.length;
+      return {payloadSize: content.length};
     }, {fork: true}).showThroughput();
   });
 
@@ -167,9 +166,9 @@ perfContext('Parser performance - 50MB data', () => {
       while (content.length < 50000000)  // test with +50MB
         content += data;
     });
-    throughput('throughput', () => {
+    new ThroughputRuntimeCase('throughput', () => {
       parser.parse(content);
-      return content.length;
+      return {payloadSize: content.length};
     }, {fork: true}).showThroughput();
   });
 
@@ -180,9 +179,9 @@ perfContext('Parser performance - 50MB data', () => {
       while (content.length < 50000000)  // test with +50MB
         content += data;
     });
-    throughput('throughput', () => {
+    new ThroughputRuntimeCase('throughput', () => {
       parser.parse(content);
-      return content.length;
+      return {payloadSize: content.length};
     }, {fork: true}).showThroughput();
   });
 });

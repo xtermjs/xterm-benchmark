@@ -1,5 +1,6 @@
 import * as commander from 'commander';
-import { run, showTree, ICmdlineOverrides, CMDLINE_OVERRIDES } from './index';
+import { run, showTree, CMDLINE_OVERRIDES } from './index';
+import { ICmdlineOverrides } from './interfaces';
 
 async function main(): Promise<void> {
   commander
