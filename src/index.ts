@@ -13,6 +13,8 @@ import { IPerfOptions, ICmdlineOverrides, IStackToken, PerfType, IPerfTree, IPer
 import * as path from 'path';
 import { fork } from 'child_process';
 import { Runtime, Throughput } from './mixins';
+import { TimelineRunner, timeline } from 'chrome-timeline';
+import { ISummary } from 'chrome-timeline/lib/interfaces';
 
 
 const DEFAULT_OPTIONS: IPerfOptions = {
@@ -51,11 +53,12 @@ function addToStack(token: IStackToken): void {
 
 /**
  * PerfContext
+ * 
  * Runtime representation of a `perfContext` enclosure for perf cases with
  * `before`, `beforeEach`, `after` and `afterEach` support.
  * Note that a file will automatically get a toplevel context with
  * the filename as `.name`.
- * For the preparation/cleanup methods only of each kind is respected. This is
+ * For preparation/cleanup methods only one of each kind is respected. This is
  * not enforced so a later definition will override an earlier one.
  * They can be defined at any position in the context callback (even top level),
  * beside that JS lexical scoping rules apply as expected.
@@ -207,7 +210,42 @@ class PerfContext {
 
 /**
  * PerfCase
- * Base class for performance cases.
+ * 
+ * Base class for simple performance cases in nodejs.
+ * Wraps a callback for runtime measuring and postprocessing.
+ * 
+ * Possible Options:
+ * 
+ *    - repeat
+ *      Repeat callback n times. Defaults to 1. Forked perf cases repeat the callback
+ *      within one child (no additional processes created).
+ * 
+ *    - fork
+ *      Run perf case in single mode in a child process. This is especially useful
+ *      to get a clean process env without pending GC calls or busy event loop.
+ *      The process is created by child_process.fork and can be customized with
+ *      `forkArgs``and `forkOptions`.
+ *      The results are send to the parent process via `process.send`.
+ *      Note: The parent process will wait for forked perf cases results,
+ *      they are not run in parallel to avoid false numbers due to heavy system usage.
+ * 
+ * For a single run the runtime is measured with a high resolution timer, the result is stored
+ * in ICaseResult along with the return value and additional run information.
+ * 
+ * Postprocessing
+ * After a single run post processing or filtering be can hooked in with `.postEach(cb)`,
+ * after all runs it can be done with `.postAll(cb)`. The callbacks either get a single
+ * ICaseResult or ICaseResult[] as argument. The callbacks are chained, thus for
+ * `.postEach(cb1).postEach(cb2)` `cb2` will see the changes of `cb1`.
+ * For often used or more complicated post actions consider using a mixin with convenient methods.
+ * Note: ICaseResult is not set immutable, thus it is possible to alter and even to delete properties.
+ * Altering entries is ok as long the expectations of following processors are still met.
+ * Deleting is dangerous and likely to break things. Adding entries should be preferred.
+ * `.postEach` has one special case - returning `null` will drop the current result,
+ * thus later `.postEach` and all `postAll` callbacks will not see it
+ * (useful as opt-out for unwanted results).
+ * 
+ * TODO: Further data aggregation...
  */
 export class PerfCase implements IPerfCase {
   public type: PerfType = PerfType.PerfCase;
@@ -217,7 +255,7 @@ export class PerfCase implements IPerfCase {
   public results: ICaseResult[] = [];
   public summary: { [key: string]: any } = {};
   public path: string[] | null = null;
-  constructor(public name: string, public callback: () => void, opts?: IPerfOptions) {
+  constructor(public name: string, public callback: (...args: any[]) => void, opts?: IPerfOptions) {
     this.options = Object.assign({}, DEFAULT_OPTIONS, opts, CMDLINE_OVERRIDES);
     addToStack(this);
   }
@@ -229,7 +267,7 @@ export class PerfCase implements IPerfCase {
     this._all.push(callback);
     return this;
   }
-  private async _processSingle(result: ICaseResult): Promise<void> {
+  protected async _processSingle(result: ICaseResult): Promise<void> {
     for (let i = 0; i < this._single.length; ++i) {
       const altered = await this._single[i](result);
       if (altered === null) {
@@ -241,7 +279,7 @@ export class PerfCase implements IPerfCase {
     }
     this.results.push(result);
   }
-  private async _processFinal(): Promise<void> {
+  protected async _processFinal(): Promise<void> {
     for (let i = 0; i < this._all.length; ++i) {
       const altered = await this._all[i](this.results);
       if (altered && altered !== this.results) {
@@ -285,6 +323,48 @@ export class PerfCase implements IPerfCase {
   }
   public getIndent(): string {
     return INDENT.repeat(this.path.length);
+  }
+}
+
+/**
+ * TimelinePerfCase
+ * 
+ * Derived PerfCase to do puppeteer based runtime tracing.
+ * Runs the callback in a TimelineRunner from chrome-timeline.
+ * The callback gets the runner instance as argument.
+ * Returns the trace summaries in `result.returnValue`.
+ * 
+ * Options: TODO...
+ */
+export class TimelinePerfCase extends PerfCase {
+  // override run to call into chrome-timeline
+  // since the tests are meant for remote anyways
+  // also disable fork variant
+  public async run(parentPath: string[], _: boolean = false): Promise<void> {
+    this.path = parentPath.concat(this.name);
+    for (let repeat = 0; repeat < this.options.repeat; ++repeat) {
+      const runner = new TimelineRunner(); // TODO: insert opts
+      await runner.start();
+      let start;
+      let runtime;
+      try {
+        start = process.hrtime();
+        await runner.run(this.callback);
+      } finally {
+        runtime = process.hrtime(start);
+        await runner.end();
+      }
+      const result: ICaseResult = {
+        name: this.name,
+        path: this.path,
+        runtime,
+        returnValue: runner.traceSummaries,
+        run: repeat + 1,
+        repeat: this.options.repeat
+      };
+      await this._processSingle(result);
+    }
+    await this._processFinal();
   }
 }
 

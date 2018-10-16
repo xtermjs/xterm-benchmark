@@ -1,9 +1,9 @@
 export interface IPerfOptions {
-  fork: boolean;
+  fork?: boolean;
   forkArgs?: string[];
   forkOptions?: any;
   timeout?: number;
-  repeat: number;
+  repeat?: number;
 }
 
 export interface ICmdlineOverrides {
@@ -15,7 +15,7 @@ export interface IStackToken {
   type: PerfType;
   options?: IPerfOptions;
   name: string;
-  callback(): void;
+  callback(...args: any[]): void;
 }
 
 export interface IPerfCase extends IStackToken {
