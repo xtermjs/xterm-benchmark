@@ -211,7 +211,7 @@ export function ExtractFromTimeline<TBase extends PerfCaseConstructor>(Base: TBa
             console.log(`${this.getIndent()}   ${key} ${Number(record[traceName][key].selfTime).toFixed(0)} ms (self), ${Number(record[traceName][key].totalTime).toFixed(0)} ms (total)`);
           }
         }
-      })
+      });
       return this;
     }
     public showAverageSummaries(): this {
@@ -230,8 +230,8 @@ export function ExtractFromTimeline<TBase extends PerfCaseConstructor>(Base: TBa
           }
           console.log(this.getIndent() + entries.join(' '));
         }
-      })
+      });
       return this;
     }
-  }
+  };
 }
