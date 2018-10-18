@@ -3,7 +3,6 @@ import { ExtractFromTimeline } from '../mixins';
 import { TimelineRunner } from 'chrome-timeline';
 import { spawn, ChildProcess } from 'child_process';
 
-
 function bashspawn(command: string): ChildProcess {
   return spawn('sh', ['-c', command], { stdio: ['ignore', 'ignore', 'inherit'], detached: true });
 }
@@ -15,7 +14,7 @@ before(async () => {
   await new Promise(resolve => setTimeout(resolve, 7000));
 });
 
-after(async () => {
+function killChild() {
   try {
     process.kill(-child.pid);
   } catch (e) {
@@ -23,7 +22,13 @@ after(async () => {
       child.kill();
     } catch (e) {}
   }
+}
+
+process.once('SIGINT', () => {
+  killChild();
+  process.kill(process.pid, 'SIGINT');
 });
+after(killChild);
 
 const TimelineRuntime = ExtractFromTimeline(TimelinePerfCase);
 new TimelineRuntime('timeline', async (runner: TimelineRunner) => {
@@ -35,8 +40,13 @@ new TimelineRuntime('timeline', async (runner: TimelineRunner) => {
     setTimeout(done, 3000);
   });
   await runner.tracingStop();
+  await runner.tracingStart('TRACE2');
+  await runner.remote((done: () => void, window: Window) => {
+    setTimeout(done, 100);
+  });
+  await runner.tracingStop();
 }, {repeat: 1})
-.extractTopDownValues({'TRACE_ABC': ['EscapeSequenceParser.parse', 'InputHandler.print']})
+.extractTopDownValues({'TRACE_ABC': ['EscapeSequenceParser.parse', 'InputHandler.print'], 'TRACE2': ['setTimeout']})
 .extractSummaries()
 .averageSummaries()
 .averageTopDownValues()

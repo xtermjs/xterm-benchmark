@@ -1,5 +1,7 @@
 import { IPerfCase, ICaseResult } from './interfaces';
 import { IEvent, ISummary } from 'chrome-timeline/lib/interfaces';
+import * as math from 'mathjs';
+import { reshapeFn } from './helper';
 
 /**
  * Predefined mixins for PerfCase
@@ -140,61 +142,29 @@ export function ExtractFromTimeline<TBase extends PerfCaseConstructor>(Base: TBa
     }
     public averageTopDownValues(): this {
       this.postAll((results: ICaseResultTimelineData[]) => {
-        const final: {[traceName: string]: any} = {};
-        const counter: {[traceName: string]: any} = {};
-        for (let i = 0; i < results.length; ++i) {
-          for (const traceName in results[i].extractedTopDownValues) {
-            if (!final[traceName]) {
-              final[traceName] = {};
-              counter[traceName] = {};
-            }
-            for (const symbol in results[i].extractedTopDownValues[traceName]) {
-              if (!final[traceName][symbol]) {
-                final[traceName][symbol] = {selfTime: 0, totalTime: 0, name: results[i].extractedTopDownValues[traceName][symbol].name};
-                counter[traceName][symbol] = 0;
-              }
-              final[traceName][symbol].selfTime += results[i].extractedTopDownValues[traceName][symbol].selfTime;
-              final[traceName][symbol].totalTime += results[i].extractedTopDownValues[traceName][symbol].totalTime;
-              counter[traceName][symbol]++;
-            }
-          }
+        try {
+          this.summary['averageTimelineTopDown'] = reshapeFn([
+            ':zip', 'extractedTopDownValues', ':zip', ':keys', ':zip', ':keys', ':zip',
+            (el: any, fn: Function) => fn({name: el.name[0] || '<noname>', selfTime: el.selfTime, totalTime: el.totalTime}),
+            ':keys',
+            (el: any, fn: Function) => (el instanceof Array) ? fn({values: el, mean: math.mean(el), dev: math.std(el)}) : el
+          ])(results);
+        } catch (e) {
+          console.log(e);
         }
-        for (const traceName in final) {
-          for (const symbol in final[traceName]) {
-            final[traceName][symbol].selfTime /= counter[traceName][symbol];
-            final[traceName][symbol].totalTime /= counter[traceName][symbol];
-          }
-        }
-        this.summary['averageTimelineTopDown'] = final;
       });
       return this;
     }
     public averageSummaries(): this {
       this.postAll((results: ICaseResultTimelineData[]) => {
-        const final: {[traceName: string]: any} = {};
-        const counter: {[traceName: string]: any} = {};
-        for (let i = 0; i < results.length; ++i) {
-          for (const traceName in results[i].extractedSummaries) {
-            if (!final[traceName]) {
-              final[traceName] = {};
-              counter[traceName] = {};
-            }
-            for (const key in results[i].extractedSummaries[traceName]) {
-              if (!final[traceName][key]) {
-                final[traceName][key] = 0;
-                counter[traceName][key] = 0;
-              }
-              final[traceName][key] += results[i].extractedSummaries[traceName][key];
-              counter[traceName][key]++;
-            }
-          }
+        try {
+          this.summary['averageTimelineSummaries'] = reshapeFn([
+            ':zip', 'extractedSummaries', ':zip', ':keys', ':zip', ':keys',
+            (el: any, fn: Function) => fn({values: el, mean: math.mean(el), dev: math.std(el)})
+          ])(results);
+        } catch (e) {
+          console.log(e);
         }
-        for (const traceName in final) {
-          for (const key in final[traceName]) {
-            final[traceName][key] /= counter[traceName][key];
-          }
-        }
-        this.summary['averageTimelineSummaries'] = final;
       });
       return this;
     }
@@ -206,9 +176,11 @@ export function ExtractFromTimeline<TBase extends PerfCaseConstructor>(Base: TBa
         }
         const record = this.summary['averageTimelineTopDown'];
         for (const traceName in record) {
-          console.log(`${this.getIndent()}Trace "${traceName}" topDown average for symbols over ${results.length} runs:`);
+          console.log(`${this.getIndent()}Trace "${traceName}" topDown symbols average over ${results.length} runs:`);
           for (const key in record[traceName]) {
-            console.log(`${this.getIndent()}   ${key} ${Number(record[traceName][key].selfTime).toFixed(0)} ms (self), ${Number(record[traceName][key].totalTime).toFixed(0)} ms (total)`);
+            let msg = `${this.getIndent()}   ${key} ${Number(record[traceName][key].selfTime.mean).toFixed(0)} ms (self), `
+                    + `${Number(record[traceName][key].totalTime.mean).toFixed(0)} ms (total)`;
+            console.log(msg);
           }
         }
       });
@@ -222,11 +194,11 @@ export function ExtractFromTimeline<TBase extends PerfCaseConstructor>(Base: TBa
         }
         const record = this.summary['averageTimelineSummaries'];
         for (const traceName in record) {
-          console.log(`${this.getIndent()}Trace "${traceName}" average over ${results.length} runs:`);
+          console.log(`${this.getIndent()}Trace "${traceName}" summary average over ${results.length} runs:`);
           let s = this.getIndent();
           const entries = [];
           for (const key in record[traceName]) {
-            entries.push(`${key}: ${Number(record[traceName][key]).toFixed(0)}`);
+            entries.push(`${key}: ${Number(record[traceName][key].mean).toFixed(0)}`);
           }
           console.log(this.getIndent() + entries.join(' '));
         }
