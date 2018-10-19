@@ -7,6 +7,7 @@ const perfContext = require('../lib/index').perfContext;
 const ThroughputRuntimeCase = require('../lib/index').ThroughputRuntimeCase;
 const PerfCase = require('../lib/index').PerfCase;
 const mixins = require('../lib/mixins');
+const descriptiveStats = require('../lib/helper').descriptiveStats;
 
 
 let a = 'grrrr';
@@ -78,9 +79,20 @@ perfContext('ctx1', () => {
   }, {repeat: 10}).showRuntime().showAverageRuntime().showThroughput().showAverageThroughput();
 });
 
-
+// mixin in JS with some custom baseline data record
+// --> entry in summary must contain the values and the descriptive stats
+// --> can be arbitrary depth to get accounted for baseline
 const Mixed = mixins.Throughput(mixins.Runtime(PerfCase));
 new Mixed('mixins in JS', () => {
   console.log('works?');
   return {payloadSize: 1000000};
-}).showAverageRuntime().showAverageThroughput();
+}).showAverageRuntime().showAverageThroughput().postAll((results, perf) => {
+  const values = [1,2,3,4,5];
+  perf.summary['custom'] = Object.assign({values}, descriptiveStats(values));
+  perf.summary['customWithSubs'] = {
+    sub1: Object.assign({values}, descriptiveStats(values)),
+    sub2: {
+      subsub: Object.assign({values}, descriptiveStats(values))
+    }
+  };
+});

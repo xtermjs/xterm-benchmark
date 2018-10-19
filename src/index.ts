@@ -1,26 +1,27 @@
 /**
  * TODO:
+ *    - cleanup/refactoring of baseline + config stuff
  *    - timeout option
- *    - json option not working anymore
- *    - remove global CMDLINE_OVERRIDE
  *    - async error handling/propagation
  *    - test cases
- *    - git integration mixin
+ *    - abort on error for baseline and eval runs
  */
 
 import { IPerfOptions, ICmdlineOverrides, IStackToken, PerfType, IPerfTree, IPerfCase, ICaseResult } from './interfaces';
 import * as path from 'path';
 import { fork } from 'child_process';
 import { Runtime, Throughput } from './mixins';
-import { TimelineRunner, timeline } from 'chrome-timeline';
+import { TimelineRunner } from 'chrome-timeline';
+import * as fs from 'fs';
+import { mapObjectValues } from './helper';
 
-
-const DEFAULT_OPTIONS: IPerfOptions = {
+export const DEFAULT_OPTIONS: IPerfOptions = {
   fork: false,
   repeat: 1
 };
 export const CMDLINE_OVERRIDES: ICmdlineOverrides = {}; // FIXME: get rid of export
 const INDENT = '   ';
+export const LOGPATHS: string[] = [];
 
 /**
  * Global symbol stack.
@@ -247,8 +248,8 @@ class PerfContext {
  */
 export class PerfCase implements IPerfCase {
   public type: PerfType = PerfType.PerfCase;
-  private _single: ((result: ICaseResult) => ICaseResult | void)[] = [];
-  private _all: ((result: ICaseResult[]) => ICaseResult[] | void)[] = [];
+  private _single: ((result: ICaseResult, perfCase: this) => ICaseResult | void)[] = [];
+  private _all: ((result: ICaseResult[], perfCase: this) => ICaseResult[] | void)[] = [];
   public options: IPerfOptions;
   public results: ICaseResult[] = [];
   public summary: { [key: string]: any } = {};
@@ -257,17 +258,17 @@ export class PerfCase implements IPerfCase {
     this.options = Object.assign({}, DEFAULT_OPTIONS, opts, CMDLINE_OVERRIDES);
     addToStack(this);
   }
-  public postEach(callback: (result: ICaseResult) => ICaseResult | void): this {
+  public postEach(callback: (result: ICaseResult) => ICaseResult | void, perfCase: this): this {
     this._single.push(callback);
     return this;
   }
-  public postAll(callback: (results: ICaseResult[]) => ICaseResult[] | void): this {
+  public postAll(callback: (results: ICaseResult[]) => ICaseResult[] | void, perfCase: this): this {
     this._all.push(callback);
     return this;
   }
   protected async _processSingle(result: ICaseResult): Promise<void> {
     for (let i = 0; i < this._single.length; ++i) {
-      const altered = await this._single[i](result);
+      const altered = await this._single[i](result, this);
       if (altered === null) {
         return;
       }
@@ -279,9 +280,26 @@ export class PerfCase implements IPerfCase {
   }
   protected async _processFinal(): Promise<void> {
     for (let i = 0; i < this._all.length; ++i) {
-      const altered = await this._all[i](this.results);
+      const altered = await this._all[i](this.results, this);
       if (altered && altered !== this.results) {
         this.results = altered;
+      }
+    }
+  }
+  protected async _reportResults(): Promise<void> {
+    const finalReport: any = {
+      name: this.name,
+      path: this.path,
+      pathString: this.path.join('|'),
+      options: this.options,
+      summary: this.summary
+    };
+    if (this.options.reportFullResults) {
+      finalReport.results = this.results;
+    }
+    for (const path of LOGPATHS) {
+      if (path) {
+        fs.appendFileSync(path, JSON.stringify(finalReport, null) + '\n');
       }
     }
   }
@@ -317,6 +335,7 @@ export class PerfCase implements IPerfCase {
     }
     if (!forked) {
       await this._processFinal();
+      await this._reportResults();
     }
   }
   public getIndent(): string {
@@ -363,6 +382,7 @@ export class TimelinePerfCase extends PerfCase {
       await this._processSingle(result);
     }
     await this._processFinal();
+    await this._reportResults();
   }
 }
 
@@ -438,6 +458,240 @@ export function showTree(filename: string): void {
     const ctx = new PerfContext(filename, null);
     console.log(JSON.stringify(ctx.getTree(), null, 2));
   } catch (e) { console.log(e); }
+}
+
+
+const columnify = require('columnify');
+
+enum EvalResultState {
+  Success,
+  Missing,
+  Skipped,
+  Failed
+}
+
+interface IBaselineData {
+  stat: string;
+  base: number;
+  tolerance?: null | number[];
+  value?: number;
+  eval?: EvalResultState;
+}
+
+function _createBaselineData(summary: { [key: string]: any}): {[key: string]: IBaselineData[]} {
+  const baselineData: {[key: string]: IBaselineData[]} = {};
+  const descendWithPath = (el: any, path: string[]) => {
+    mapObjectValues(el, (sub: any, name: string) => {
+      if (!sub || sub instanceof Array || typeof sub === 'string' || typeof sub === 'number') {
+        return;
+      }
+      if (sub.mean) {
+        baselineData[path.concat(name).join('.')] = [
+          {stat: 'mean', base: sub.mean},
+          {stat: 'median', base: sub.median},
+          {stat: 'dev', base: sub.dev},
+          {stat: 'cv', base: sub.cv},
+          {stat: 'runs', base: sub.values.length}
+        ];
+      } else {
+        descendWithPath(sub, path.concat(name));
+      }
+    });
+  };
+  descendWithPath(summary, []);
+  return baselineData;
+}
+
+interface IEvalConfig {
+  tolerance: {[key: string]: number[]};
+  skip: string[];
+}
+
+const DEFAULT_TOLERANCE = [0.25, 4.0];
+export const EVAL_CONFIG: IEvalConfig = {
+  tolerance : {'*': DEFAULT_TOLERANCE},
+  skip: [],
+};
+
+const FILTER_FN = (token: string) => token.replace('|', '[|]').replace('.', '[.]').replace('*', '.+?');
+
+function getTolerance(treePath: string, dataPath: string): number[] | null {
+  const path = treePath + '#' + dataPath;
+  if (EVAL_CONFIG.skip.filter(el => path.match(FILTER_FN(el))).pop()) {
+    return null;
+  }
+  return Object.getOwnPropertyNames(EVAL_CONFIG.tolerance).map(
+      name => path.match(FILTER_FN(name)) ? EVAL_CONFIG.tolerance[name] : null
+    ).filter(el => el).pop() || DEFAULT_TOLERANCE;
+}
+
+export function getDataForBaseline(path: string): {[key: string]: {[key: string]: IBaselineData[]}} {
+  const caseResults = fs.readFileSync(path, {encoding: 'utf8'}).split('\n').filter(line => line).map(line => JSON.parse(line));
+  const baselineData: {[key: string]: {[key: string]: IBaselineData[]}} = {};
+  caseResults.forEach(entry => baselineData[entry.path] = _createBaselineData(entry.summary));
+  return baselineData;
+}
+
+function _applyTolerance(data: IBaselineData[], treePath: string, dataPath: string): IBaselineData[] {
+  data.forEach(el => el.tolerance = getTolerance(treePath, dataPath + '.' + el.stat));
+  return data;
+}
+
+/**
+ * Show baseline stats to be accounted.
+ */
+export function showBaselineData(path: string) {
+  const data = getDataForBaseline(path);
+  console.log('\n### Baseline data ###');
+  mapObjectValues(data, (value: {[key: string]: IBaselineData[]}, key: string) => {
+    console.log(`"${key}"`);
+    mapObjectValues(value, (vvalue: IBaselineData[], kkey: string) => {
+      const tolerance = getTolerance(key, kkey);
+      console.log(((!tolerance) ? '\x1b[36m' : '') + INDENT + '#' + kkey + ((!tolerance) ? ' - skipped' : '') + '\x1b[0m');
+      _applyTolerance(vvalue, key, kkey);
+      const msg = columnify(vvalue, {
+        minWidth: 10,
+        align: 'right',
+        config: {
+          stat: {
+            align: 'left'
+          },
+          base: {
+            dataTransform: (el: string) => Number(el).toFixed(2)
+          },
+          value: {
+            dataTransform: (el: string) => Number(el).toFixed(2)
+          },
+          tolerance: {
+            dataTransform: (el: string) => (el === '')
+              ? '\x1b[36mskipped\x1b[0m'
+              : el.split(',').map(el => Number(el).toFixed(2)).join('-')
+          },
+          eval: {
+            dataTransform: (el: string) => {
+              // columnify already made string of it so parse back :(
+              switch (parseInt(el)) {
+                case EvalResultState.Success:
+                  return '\x1b[32mOK\x1b[0m';
+                case EvalResultState.Missing:
+                  return '\x1b[33mMISS\x1b[0m';
+                case EvalResultState.Skipped:
+                  return '\x1b[36mSKIP\x1b[0m';
+                case EvalResultState.Failed:
+                  return '\x1b[31mFAILED\x1b[0m';
+                default:
+                  return '';
+              }
+            }
+          }
+        }
+      });
+      console.log(INDENT.repeat(2) + msg.split('\n').join('\n' + INDENT.repeat(2)));
+    });
+  });
+}
+
+function _applyEval(baselineEntries: IBaselineData[], evalEntries: IBaselineData[], treePath: string, dataPath: string, stats: IEvalStats): void {
+  baselineEntries.forEach((el, idx) => {
+    el.tolerance = getTolerance(treePath, dataPath + '.' + el.stat);
+    el.value = (evalEntries && evalEntries[idx]) ? evalEntries[idx].base : undefined;
+    if (typeof el.value === 'undefined') {
+      el.eval = EvalResultState.Missing;
+      stats.missing++;
+      return;
+    }
+    if (!el.tolerance) {
+      el.eval = EvalResultState.Skipped;
+      stats.skipped++;
+      return;
+    }
+    const deviation = el.value / (el.base || 0.00001);
+    if (deviation >= el.tolerance[0] && deviation <= el.tolerance[1]) {
+      el.eval = EvalResultState.Success;
+      stats.success++;
+      return;
+    }
+    el.eval = EvalResultState.Failed;
+    stats.failed++;
+  });
+}
+
+export interface IEvalStats {
+  success: number;
+  missing: number;
+  skipped: number;
+  failed: number;
+}
+
+/**
+ * Eval run against baseline.
+ */
+export function evalRun(basePath: string, evalPath: string): IEvalStats {
+  const baselineData = getDataForBaseline(basePath);
+  const evalData = getDataForBaseline(evalPath);
+  const stats: IEvalStats = {
+    success: 0,
+    missing: 0,
+    skipped: 0,
+    failed: 0
+  };
+
+  mapObjectValues(baselineData, (value: {[key: string]: IBaselineData[]}, key: string) => {
+    console.log(`"${key}"`);
+    const evalPart = evalData[key];
+    mapObjectValues(value, (vvalue: IBaselineData[], kkey: string) => {
+      const tolerance = getTolerance(key, kkey);
+      console.log(((!tolerance) ? '\x1b[36m' : '') + INDENT + '#' + kkey + ((!tolerance) ? ' - skipped' : '') + '\x1b[0m');
+      _applyTolerance(vvalue, key, kkey);
+      const evalSubPart = (evalPart) ? evalPart[kkey] : undefined;
+      _applyEval(vvalue, evalSubPart, key, kkey, stats);
+      const msg = columnify(vvalue, {
+        minWidth: 10,
+        align: 'right',
+        config: {
+          stat: {
+            align: 'left'
+          },
+          base: {
+            dataTransform: (el: string) => Number(el).toFixed(2)
+          },
+          value: {
+            dataTransform: (el: string) => Number(el).toFixed(2)
+          },
+          tolerance: {
+            dataTransform: (el: string) => (el === '')
+              ? '\x1b[36mskipped\x1b[0m'
+              : el.split(',').map(el => Number(el).toFixed(2)).join('-')
+          },
+          eval: {
+            dataTransform: (el: string) => {
+              // columnify already made string of it so parse back :(
+              switch (parseInt(el)) {
+                case EvalResultState.Success:
+                  return '\x1b[32mOK\x1b[0m';
+                case EvalResultState.Missing:
+                  return '\x1b[33mMISS\x1b[0m';
+                case EvalResultState.Skipped:
+                  return '\x1b[36mSKIP\x1b[0m';
+                case EvalResultState.Failed:
+                  return '\x1b[31mFAILED\x1b[0m';
+                default:
+                  return '';
+              }
+            }
+          }
+        }
+      });
+      console.log(INDENT.repeat(2) + msg.split('\n').join('\n' + INDENT.repeat(2)));
+    });
+  });
+  console.log('\n');
+  console.log(`\x1b[32m Success: ${stats.success}\x1b[0m`);
+  console.log(`\x1b[33m Missing: ${stats.missing}\x1b[0m`);
+  console.log(`\x1b[36m Skipped: ${stats.skipped}\x1b[0m`);
+  console.log(`\x1b[31m Failed: ${stats.failed}\x1b[0m`);
+
+  return stats;
 }
 
 /**

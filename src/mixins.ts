@@ -1,7 +1,6 @@
 import { IPerfCase, ICaseResult } from './interfaces';
 import { IEvent, ISummary } from 'chrome-timeline/lib/interfaces';
-import * as math from 'mathjs';
-import { reshapeFn } from './helper';
+import { reshapeFn, descriptiveStats } from './helper';
 
 /**
  * Predefined mixins for PerfCase
@@ -19,23 +18,37 @@ export function Runtime<TBase extends PerfCaseConstructor>(Base: TBase) {
     constructor(...args: any[]) {
       super(...args);
       this.postAll((results: ICaseResult[]): void => {
-        let average = 0;
-        for (let i = 0; i < results.length; ++i) {
-          average += (results[i].runtime[1] / 1000000 + results[i].runtime[0] * 1000);
+        try {
+          this.summary['averageRuntime'] = reshapeFn([
+            ':zip', 'runtime',
+            (el: any, fn: Function): any => {
+              if (el instanceof Array) {
+                const msecs = el.map(item => item[1] / 1000000 + item[0] * 1000);
+                return fn(Object.assign({values: el, valuesMs: msecs}, descriptiveStats(msecs)));
+              }
+              return el;
+            }
+          ])(results);
+        } catch (e) {
+          console.error(e);
+          console.error(`reshaped data was:\n${reshapeFn([':zip', 'runtime'])(results)}`);
         }
-        this.summary['averageRuntime'] = average / results.length;
       });
     }
     public showRuntime(): this {
       this.postEach((result: ICaseResult): ICaseResult => {
-        console.log(`${this.getIndent()}Case "${this.name}" : ${result.run} - runtime: ${Number(result.runtime[1] / 1000000 + result.runtime[0] * 1000).toFixed(2)} ms`);
+        const msg = `${this.getIndent()}Case "${this.name}" : ${result.run} - runtime: `
+                  + `${Number(result.runtime[1] / 1000000 + result.runtime[0] * 1000).toFixed(2)} ms`;
+        console.log(msg);
         return result;
       });
       return this;
     }
     public showAverageRuntime(): this {
       this.postAll((results: ICaseResult[]): void => {
-        console.log(`${this.getIndent()}Case "${this.name}" : ${results.length} runs - average runtime: ${Number(this.summary['averageRuntime']).toFixed(2)} ms`);
+        const msg = `${this.getIndent()}Case "${this.name}" : ${results.length} runs - average runtime: `
+                  + `${Number(this.summary['averageRuntime'].mean).toFixed(2)} ms`;
+        console.log(msg);
       });
       return this;
     }
@@ -46,7 +59,6 @@ interface ICaseResultThroughput extends ICaseResult {
   throughput: number;
 }
 
-// throughput - aggregates throughtput and averageThroughput in MB/s
 /**
  * Throughput mixin for PerfCase.
  * Appends `throughput` to each ICaseResult and `averageThroughput` to summary in MB/s.
@@ -62,34 +74,50 @@ export function Throughput<TBase extends PerfCaseConstructor>(Base: TBase) {
           ? 1000 / msec * result.returnValue.payloadSize / 1024 / 1024 : 0;
       });
       this.postAll((results: ICaseResultThroughput[]): void => {
-        let average = 0;
-        for (let i = 0; i < results.length; ++i) {
-          average += results[i].throughput;
+        try {
+          this.summary['averageThroughput'] = reshapeFn([
+              ':zip', 'throughput',
+              (el: any, fn: Function) => (el instanceof Array) ? fn(Object.assign({values: el}, descriptiveStats(el))) : el
+            ])(results);
+        } catch (e) {
+          console.error(e);
+          console.error(`reshaped data was:\n${reshapeFn([':zip', 'throughput'])(results)}`);
         }
-        this.summary['averageThroughput'] = average / results.length;
       });
     }
     public showThroughput(): this {
       this.postEach((result: ICaseResultThroughput): void => {
-        console.log(`${this.getIndent()}Case "${this.name}" : ${result.run} - throughput: ${Number(result.throughput).toFixed(2)} MB/s`);
+        const msg = `${this.getIndent()}Case "${this.name}" : ${result.run} - `
+                  + `throughput: ${Number(result.throughput).toFixed(2)} MB/s`;
+        console.log(msg);
       });
       return this;
     }
     public showAverageThroughput(): this {
       this.postAll((results: ICaseResultThroughput[]): void => {
-        console.log(`${this.getIndent()}Case "${this.name}" : ${results.length} runs - average throughput: ${Number(this.summary['averageThroughput'] / results.length).toFixed(2)} MB/s`);
+        const msg = `${this.getIndent()}Case "${this.name}" : ${results.length} runs - average throughput: `
+                  + `${Number(this.summary['averageThroughput'].mean).toFixed(2)} MB/s`;
+        console.log(msg);
       });
       return this;
     }
   };
 }
 
-// extract runtime data from chrome-timeline trace summary
+
 type IExtractData = {[symbol: string]: IEvent};
 interface ICaseResultTimelineData extends ICaseResult {
   extractedTopDownValues?: {[traceName: string]: IExtractData};
   extractedSummaries?: {[traceName: string]: {[key: string]: number}};
 }
+
+/**
+ * Mixin to extract data from chrome-timeline reports.
+ * `.averageTopDownValues()` appends `averageTimelineTopDown` to summary,
+ * the data to be processed are determined by a previous call of
+ * `.extractTopDownValues({'traceName': ['symbol1', 'symbol2', ...]})`.
+ * `.averageSummaries()` appends `averageTimelineSummaries` to summary.
+ */
 export function ExtractFromTimeline<TBase extends PerfCaseConstructor>(Base: TBase) {
   return class extends Base {
     public extractTopDownValues(config: {[traceName: string]: string[]}): this {
@@ -147,10 +175,12 @@ export function ExtractFromTimeline<TBase extends PerfCaseConstructor>(Base: TBa
             ':zip', 'extractedTopDownValues', ':zip', ':keys', ':zip', ':keys', ':zip',
             (el: any, fn: Function) => fn({name: el.name[0] || '<noname>', selfTime: el.selfTime, totalTime: el.totalTime}),
             ':keys',
-            (el: any, fn: Function) => (el instanceof Array) ? fn({values: el, mean: math.mean(el), dev: math.std(el)}) : el
+            (el: any, fn: Function) => (el instanceof Array) ? fn(Object.assign({values: el}, descriptiveStats(el))) : el
           ])(results);
         } catch (e) {
-          console.log(e);
+          console.error(e);
+          console.error(`reshaped data was:\n${reshapeFn([
+            ':zip', 'extractedTopDownValues', ':zip', ':keys', ':zip', ':keys', ':zip'])(results)}`);
         }
       });
       return this;
@@ -160,10 +190,12 @@ export function ExtractFromTimeline<TBase extends PerfCaseConstructor>(Base: TBa
         try {
           this.summary['averageTimelineSummaries'] = reshapeFn([
             ':zip', 'extractedSummaries', ':zip', ':keys', ':zip', ':keys',
-            (el: any, fn: Function) => fn({values: el, mean: math.mean(el), dev: math.std(el)})
+            (el: any, fn: Function) => fn(Object.assign({values: el}, descriptiveStats(el)))
           ])(results);
         } catch (e) {
-          console.log(e);
+          console.error(e);
+          console.error(`reshaped data was:\n${reshapeFn([
+            ':zip', 'extractedSummaries', ':zip', ':keys', ':zip', ':keys'])(results)}`);
         }
       });
       return this;
@@ -178,8 +210,8 @@ export function ExtractFromTimeline<TBase extends PerfCaseConstructor>(Base: TBa
         for (const traceName in record) {
           console.log(`${this.getIndent()}Trace "${traceName}" topDown symbols average over ${results.length} runs:`);
           for (const key in record[traceName]) {
-            let msg = `${this.getIndent()}   ${key} ${Number(record[traceName][key].selfTime.mean).toFixed(0)} ms (self), `
-                    + `${Number(record[traceName][key].totalTime.mean).toFixed(0)} ms (total)`;
+            const msg = `${this.getIndent()}   ${key} ${Number(record[traceName][key].selfTime.mean).toFixed(0)} ms (self), `
+                      + `${Number(record[traceName][key].totalTime.mean).toFixed(0)} ms (total)`;
             console.log(msg);
           }
         }

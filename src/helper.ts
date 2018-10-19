@@ -1,3 +1,5 @@
+import * as math from 'mathjs';
+
 // zip a..n --> [[a.0 .. n.0] .. [a.X .. n.X]]
 export function zip(...args: any[]) {
   const names = new Set();
@@ -22,7 +24,7 @@ export function zip(...args: any[]) {
 // map for object values
 export function mapObjectValues(obj: any, fn: Function) {
   const clone = Object.assign({}, obj);
-  Object.getOwnPropertyNames(clone).forEach(name => clone[name] = fn(clone[name]));
+  Object.getOwnPropertyNames(clone).forEach(name => clone[name] = fn(clone[name], name));
   return clone;
 }
 
@@ -79,4 +81,13 @@ export function reshapeFn(symbols: any[]): (data: any) => any {
       ? ((prev) => (el: any) => PREDEFINED[key](el, prev))(fn)
       : ((prev) => (el: any) => PREDEFINED['PROP'](el, key, prev))(fn),
   (el: any) => el);
+}
+
+// rudimentary descriptive statistics
+export function descriptiveStats(array: number[] | number[][] | math.Matrix) {
+  const mean = math.mean(array);
+  const median = math.median(array);
+  const dev = math.std(array);
+  const cv = dev / mean;
+  return {mean, median, dev, cv};
 }

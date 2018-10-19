@@ -40,13 +40,8 @@ new TimelineRuntime('timeline', async (runner: TimelineRunner) => {
     setTimeout(done, 3000);
   });
   await runner.tracingStop();
-  await runner.tracingStart('TRACE2');
-  await runner.remote((done: () => void, window: Window) => {
-    setTimeout(done, 100);
-  });
-  await runner.tracingStop();
 }, {repeat: 1})
-.extractTopDownValues({'TRACE_ABC': ['EscapeSequenceParser.parse', 'InputHandler.print'], 'TRACE2': ['setTimeout']})
+.extractTopDownValues({'TRACE_ABC': ['EscapeSequenceParser.parse', 'InputHandler.print']})
 .extractSummaries()
 .averageSummaries()
 .averageTopDownValues()

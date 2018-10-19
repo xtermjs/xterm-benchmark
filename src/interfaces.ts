@@ -1,14 +1,17 @@
 export interface IPerfOptions {
+  [key: string]: any;
   fork?: boolean;
   forkArgs?: string[];
   forkOptions?: any;
   timeout?: number;
   repeat?: number;
+  reportFullResults?: boolean;
 }
 
 export interface ICmdlineOverrides {
   repeat?: number;
   timeout?: number;
+  reportFullResults?: boolean;
 }
 
 export interface IStackToken {
@@ -21,8 +24,8 @@ export interface IStackToken {
 export interface IPerfCase extends IStackToken {
   summary: { [key: string]: any };
   path: string[] | null;
-  postEach(callback: (result: ICaseResult) => ICaseResult | void): this;
-  postAll(callback: (results: ICaseResult[]) => ICaseResult[] | void): this;
+  postEach(callback: (result: ICaseResult) => ICaseResult | void, perfCase?: this): this;
+  postAll(callback: (results: ICaseResult[]) => ICaseResult[] | void, perfCase?: this): this;
   run(parentPath: string[], forked: boolean): Promise<void>;
   getIndent(): string;
 }
