@@ -21,7 +21,7 @@ async function main(): Promise<void> {
     .option('-f, --full', 'reports all results')
     .option('-b, --baseline', 'mark run as baseline data')
     .option('-c, --config <path>', 'path to config file')
-    .option('-e, --eval', 'eval run against baseline data') // TODO
+    .option('-e, --eval', 'eval run against baseline data')
     .option('-a, --abort', 'abort on first error') // TODO
     .parse(process.argv);
 
