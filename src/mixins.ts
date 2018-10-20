@@ -146,8 +146,11 @@ export function ExtractFromTimeline<TBase extends PerfCaseConstructor>(Base: TBa
                   totalTime: a.totalTime + b.totalTime
                 });
             if (collectForTrace[symbol].name === 'wrong reduce') {
-              console.error(`ERROR - extractTopDownValues: wrong reduce for '${symbol}' in trace '${traceName}'`);
-              throw new Error(`ERROR - extractTopDownValues: wrong reduce for '${symbol}' in trace '${traceName}'`);
+              const names = new Set();
+              filteredEvents.forEach(el => names.add(el.name));
+              console.error(`ERROR - extractTopDownValues: cannot reduce '${symbol}' in trace '${traceName}', candidates:`);
+              console.error(names.values());
+              throw new Error(`ERROR - extractTopDownValues: cannot reduce '${symbol}' in trace '${traceName}'`);
             }
           });
           collect[traceName] = collectForTrace;
