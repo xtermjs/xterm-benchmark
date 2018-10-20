@@ -18,7 +18,8 @@ async function main(): Promise<void> {
     .option('-l, --logpath <path>', 'set logpath (defaults to <APP_PATH>/<EPOCH>.log)')
     .option('-S, --silent', 'no console log output')
     .option('-j, --json', 'outputs NL delimited json, equals "-S -l /dev/stdout"')
-    .option('-f, --full', 'reports all results')
+    .option('-f, --full', 'include full results in reports')
+    .option('-F, --fail', 'also fail on missings')
     .option('-b, --baseline', 'mark run as baseline data')
     .option('-c, --config <path>', 'path to config file')
     .option('-e, --eval', 'eval run against baseline data')
@@ -119,7 +120,10 @@ async function main(): Promise<void> {
   if (commander.eval) {
     try {
       const stats = evalRun(baselinePath, evalPath);
-      if (stats.summary.failed && !commander.json) {
+      if (stats.summary.failed) {
+        process.exit(2);
+      }
+      if (stats.summary.missing && commander.fail) {
         process.exit(2);
       }
     } catch (error) {
