@@ -32,6 +32,7 @@ export function Runtime<TBase extends PerfCaseConstructor>(Base: TBase) {
         } catch (e) {
           console.error(e);
           console.error(`reshaped data was:\n${reshapeFn([':zip', 'runtime'])(results)}`);
+          throw e;
         }
       });
     }
@@ -82,6 +83,7 @@ export function Throughput<TBase extends PerfCaseConstructor>(Base: TBase) {
         } catch (e) {
           console.error(e);
           console.error(`reshaped data was:\n${reshapeFn([':zip', 'throughput'])(results)}`);
+          throw e;
         }
       });
     }
@@ -145,6 +147,7 @@ export function ExtractFromTimeline<TBase extends PerfCaseConstructor>(Base: TBa
                 });
             if (collectForTrace[symbol].name === 'wrong reduce') {
               console.error(`ERROR - extractTopDownValues: wrong reduce for '${symbol}' in trace '${traceName}'`);
+              throw new Error(`ERROR - extractTopDownValues: wrong reduce for '${symbol}' in trace '${traceName}'`);
             }
           });
           collect[traceName] = collectForTrace;
@@ -181,6 +184,7 @@ export function ExtractFromTimeline<TBase extends PerfCaseConstructor>(Base: TBa
           console.error(e);
           console.error(`reshaped data was:\n${reshapeFn([
             ':zip', 'extractedTopDownValues', ':zip', ':keys', ':zip', ':keys', ':zip'])(results)}`);
+          throw e;
         }
       });
       return this;
@@ -196,6 +200,7 @@ export function ExtractFromTimeline<TBase extends PerfCaseConstructor>(Base: TBa
           console.error(e);
           console.error(`reshaped data was:\n${reshapeFn([
             ':zip', 'extractedSummaries', ':zip', ':keys', ':zip', ':keys'])(results)}`);
+          throw e;
         }
       });
       return this;

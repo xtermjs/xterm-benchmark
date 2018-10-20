@@ -110,7 +110,8 @@ export interface IEvalConfig {
 export const enum ReportType {
   PerfCase = 0,
   Base = 1,
-  Eval = 2
+  Eval = 2,
+  Error = 3
 }
 
 // report for a single perf case

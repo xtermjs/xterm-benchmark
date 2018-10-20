@@ -1,9 +1,8 @@
 /**
  * TODO:
  *    - timeout option
- *    - async error handling/propagation
  *    - test cases
- *    - abort on error for baseline and eval runs
+ *    - TimelineRunner options
  */
 
 import { IPerfOptions, ICmdlineOverrides, IStackToken, PerfType, IPerfTree, IPerfCase, ICaseResult, IBaselineEntry, EvalResultState, IEvalStatsSummary, IEvalConfig, IBaselineData, IEvalStats, ReportType, IPerfResult } from './interfaces';
@@ -146,20 +145,26 @@ class PerfContext {
 
   public async runFull(): Promise<void> {
     console.log(`${INDENT.repeat(this.getPath().length)}Context "${this.name}"`);
-    await this.before();
-    for (let i = 0; i < this.contextsOrCases.length; ++i) {
-      await this.beforeEach();
-      if (this.contextsOrCases[i].type === PerfType.Context) {
-        while (STACK.pop()) { }
-        await this.contextsOrCases[i].callback();
-        const ctx = new PerfContext(this.contextsOrCases[i].name, this);
-        await ctx.runFull();
-      } else {
-        await (this.contextsOrCases[i] as PerfCase).run(this.getPath());
+    try {
+      await this.before();
+      for (let i = 0; i < this.contextsOrCases.length; ++i) {
+        try {
+          await this.beforeEach();
+          if (this.contextsOrCases[i].type === PerfType.Context) {
+            while (STACK.pop()) { }
+            await this.contextsOrCases[i].callback();
+            const ctx = new PerfContext(this.contextsOrCases[i].name, this);
+            await ctx.runFull();
+          } else {
+            await (this.contextsOrCases[i] as PerfCase).run(this.getPath());
+          }
+        } finally {
+          await this.afterEach();
+        }
       }
-      await this.afterEach();
+    } finally {
+      await this.after();
     }
-    await this.after();
   }
 
   public async runSingle(treePath: string[], forked: boolean = false): Promise<void> {
@@ -170,25 +175,33 @@ class PerfContext {
     if (!forked) {
       console.log(`${INDENT.repeat(this.getPath().length)}Context "${this.name}"`);
     }
-    await this.before();
-    for (let i = 0; i < this.contextsOrCases.length; ++i) {
-      if (this.contextsOrCases[i].name === needle) {
-        await this.beforeEach();
-        if (this.contextsOrCases[i].type === PerfType.Context) {
-          while (STACK.pop()) { }
-          this.contextsOrCases[i].callback();
-          const ctx = new PerfContext(this.contextsOrCases[i].name, this);
-          await ctx.runSingle(treePath, forked);
-        } else {
-          await (this.contextsOrCases[i] as PerfCase).run(this.getPath(), forked);
+    try {
+      await this.before();
+      for (let i = 0; i < this.contextsOrCases.length; ++i) {
+        if (this.contextsOrCases[i].name === needle) {
+          try {
+            await this.beforeEach();
+            if (this.contextsOrCases[i].type === PerfType.Context) {
+              while (STACK.pop()) { }
+              this.contextsOrCases[i].callback();
+              const ctx = new PerfContext(this.contextsOrCases[i].name, this);
+              await ctx.runSingle(treePath, forked);
+            } else {
+              await (this.contextsOrCases[i] as PerfCase).run(this.getPath(), forked);
+            }
+            await this.afterEach();
+            await this.after();
+            return;
+          } finally {
+            await this.afterEach();
+          }
         }
-        await this.afterEach();
-        await this.after();
-        return;
       }
+    } finally {
+      await this.after();
     }
-    await this.after();
     console.error(`path not found: "${this.getPath().concat(needle).join('|')}"`);
+    throw new Error(`path not found: "${this.getPath().concat(needle).join('|')}"`);
   }
 
   /**
@@ -368,7 +381,7 @@ export class TimelinePerfCase extends PerfCase {
   public async run(parentPath: string[], _: boolean = false): Promise<void> {
     this.path = parentPath.concat(this.name);
     for (let repeat = 0; repeat < this.options.repeat; ++repeat) {
-      const runner = new TimelineRunner(); // TODO: insert opts
+      const runner = new TimelineRunner();
       await runner.start();
       let start;
       let runtime;
@@ -449,23 +462,19 @@ export type ThroughputRuntimeCaseType = InstanceType<typeof ThroughputRuntimeCas
  */
 export async function run(treePath: string[]): Promise<void> {
   while (STACK.pop()) { }
-  // try {
   const filename = treePath.shift();
   require(path.resolve(filename));
   const ctx = new PerfContext(filename, null);
   await ctx.runSingle(treePath);
-  // } catch (e) {} // TODO: handle error
 }
 
 /**
  * Log context tree to console.
  */
 export function showTree(filename: string): void {
-  try {
-    require(path.resolve(filename));
-    const ctx = new PerfContext(filename, null);
-    console.log(JSON.stringify(ctx.getTree(), null, 2));
-  } catch (e) { console.log(e); }
+  require(path.resolve(filename));
+  const ctx = new PerfContext(filename, null);
+  console.log(JSON.stringify(ctx.getTree(), null, 2));
 }
 
 /**
@@ -512,13 +521,16 @@ function getTolerance(treePath: string, dataPath: string): number[] | null {
  * Parse baselineData from a log output.
  * Also used for eval data (carried as intermediate baselineData and later merged with real baselineData).
  */
-export function getDataForBaseline(path: string): IBaselineData {
+function getDataForBaseline(path: string): IBaselineData {
   const caseResults = fs.readFileSync(path, {encoding: 'utf8'}).split('\n').filter(line => line).map(line => JSON.parse(line));
   const baselineData: IBaselineData = {};
   caseResults.forEach(entry => {
     // skip any non perf case report data
+    // also abort on erroneous data
     if (entry.type === ReportType.PerfCase) {
       baselineData[entry.path] = createBaselineData(entry.summary);
+    } else if (entry.type === ReportType.Error) {
+      throw new Error('refusing to eval erroneous data');
     }
   });
   return baselineData;
@@ -673,15 +685,10 @@ if (require.main === module) {
   if (process.send) {
     process.on('message', async msg => {
       Object.assign(CMDLINE_OVERRIDES, msg.cmdlineOverrides);
-      try {
-        const filename = msg.case.shift();
-        require(path.resolve(filename));
-        const ctx = new PerfContext(filename, null);
-        await ctx.runSingle(msg.case, true);
-      } catch (e) {
-        // TODO: handle error
-        console.log(e);
-      }
+      const filename = msg.case.shift();
+      require(path.resolve(filename));
+      const ctx = new PerfContext(filename, null);
+      await ctx.runSingle(msg.case, true);
       process.removeAllListeners('message');
     });
   }

@@ -1,6 +1,6 @@
 import * as commander from 'commander';
 import { run, showTree, CMDLINE_OVERRIDES, LOGPATHS, showBaselineData, EVAL_CONFIG, DEFAULT_OPTIONS, evalRun } from './index';
-import { ICmdlineOverrides } from './interfaces';
+import { ICmdlineOverrides, ReportType } from './interfaces';
 import * as appRoot from 'app-root-path';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -22,7 +22,6 @@ async function main(): Promise<void> {
     .option('-b, --baseline', 'mark run as baseline data')
     .option('-c, --config <path>', 'path to config file')
     .option('-e, --eval', 'eval run against baseline data')
-    .option('-a, --abort', 'abort on first error') // TODO
     .parse(process.argv);
 
   if (commander.tree) {
@@ -39,7 +38,6 @@ async function main(): Promise<void> {
   if (commander.config) {
     try {
       const config = require(path.resolve(commander.config));
-      console.log('config:', config);
 
       if (config.APP_PATH) {
         APP_PATH = path.resolve(config.APP_PATH);
@@ -53,7 +51,7 @@ async function main(): Promise<void> {
       }
     } catch (e) {
       console.error(e);
-      return;
+      process.exit(1);
     }
   }
   if (!fs.existsSync(APP_PATH)) {
@@ -92,29 +90,42 @@ async function main(): Promise<void> {
     console.log = () => {};
   }
 
-  if (commander.single) {
-    const path = commander.single.split('|');
-    await run(path);
-  } else {
-    const perfFiles = commander.args;
-    for (let i = 0; i < perfFiles.length; ++i) {
-      await run([perfFiles[i]]);
+  try {
+    if (commander.single) {
+      const path = commander.single.split('|');
+      await run(path);
+    } else {
+      const perfFiles = commander.args;
+      for (let i = 0; i < perfFiles.length; ++i) {
+        await run([perfFiles[i]]);
+      }
     }
+  } catch (error) {
+    console.error(error);
+    LOGPATHS.forEach(path => fs.appendFileSync(path, JSON.stringify({type: ReportType.Error, data: 'error'}, null) + '\n'));
+    process.exit(1);
   }
 
   if (commander.baseline) {
     try {
       showBaselineData(baselinePath);
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error(error);
+      LOGPATHS.forEach(path => fs.appendFileSync(path, JSON.stringify({type: ReportType.Error, data: 'error'}, null) + '\n'));
+      process.exit(1);
     }
   }
 
   if (commander.eval) {
     try {
-      evalRun(baselinePath, evalPath);
-    } catch (e) {
-      console.error(e);
+      const stats = evalRun(baselinePath, evalPath);
+      if (stats.summary.failed && !commander.json) {
+        process.exit(2);
+      }
+    } catch (error) {
+      console.error(error);
+      LOGPATHS.forEach(path => fs.appendFileSync(path, JSON.stringify({type: ReportType.Error, data: 'error'}, null) + '\n'));
+      process.exit(1);
     }
   }
 }
