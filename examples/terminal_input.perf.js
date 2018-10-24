@@ -98,5 +98,6 @@ perfContext('Terminal: ls -lR /usr/lib', () => {
       terminal.writeSync(content);
       return {payloadSize: content.length};
     }, {fork: true}).showRuntime().showThroughput().showAverageRuntime().showAverageThroughput();
+    //}, {fork: true, forkOptions: {execArgv: ['--inspect-brk']}}).showRuntime().showThroughput().showAverageRuntime().showAverageThroughput();
   });
 });

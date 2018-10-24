@@ -528,7 +528,7 @@ function getDataForBaseline(path: string): IBaselineData {
     // skip any non perf case report data
     // also abort on erroneous data
     if (entry.type === ReportType.PerfCase) {
-      baselineData[entry.path] = createBaselineData(entry.summary);
+      baselineData[entry.pathString] = createBaselineData(entry.summary);
     } else if (entry.type === ReportType.Error) {
       throw new Error('refusing to eval erroneous data');
     }
