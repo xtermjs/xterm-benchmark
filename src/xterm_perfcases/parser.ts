@@ -1,17 +1,16 @@
-const EscapeSequenceParser = require('xterm/lib/EscapeSequenceParser').EscapeSequenceParser;
+import { perfContext, before, beforeEach, ThroughputRuntimeCase } from '..';
+
+import { EscapeSequenceParser } from 'xterm/src/EscapeSequenceParser';
+const Parser: typeof EscapeSequenceParser = require('xterm/lib/EscapeSequenceParser').EscapeSequenceParser;
 const C0 = require('xterm/lib/common/data/EscapeSequences').C0;
 const C1 = require('xterm/lib/common/data/EscapeSequences').C1;
-const perfContext = require('../lib/index').perfContext;
-const before = require('../lib/index').before;
-const beforeEach = require('../lib/index').beforeEach;
-const ThroughputRuntimeCase = require('../lib/index').ThroughputRuntimeCase;
 
 perfContext('Parser performance - 50MB data', () => {
-  let content;
-  let parser;
+  let content: string;
+  let parser: EscapeSequenceParser;
 
   beforeEach(() => {
-    parser = new EscapeSequenceParser();
+    parser = new Parser();
     parser.setPrintHandler((data, start, end) => {});
     parser.setCsiHandler('@', (params, collect) => {});
     parser.setCsiHandler('A', (params, collect) => {});

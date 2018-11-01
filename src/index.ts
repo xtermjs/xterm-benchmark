@@ -282,11 +282,11 @@ export class PerfCase implements IPerfCase {
     this.options = Object.assign({}, DEFAULT_OPTIONS, opts, CMDLINE_OVERRIDES);
     addToStack(this);
   }
-  public postEach(callback: (result: ICaseResult) => ICaseResult | void, perfCase: this): this {
+  public postEach(callback: (result: ICaseResult, perfCase: this) => ICaseResult | void): this {
     this._single.push(callback);
     return this;
   }
-  public postAll(callback: (results: ICaseResult[]) => ICaseResult[] | void, perfCase: this): this {
+  public postAll(callback: (results: ICaseResult[], perfCase: this) => ICaseResult[] | void): this {
     this._all.push(callback);
     return this;
   }
