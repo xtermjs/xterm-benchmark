@@ -65,7 +65,7 @@ perfContext('Terminal: ls -lR /usr/lib', () => {
       return {payloadSize: content.length};
     }, {fork: true}).showRuntime().showThroughput().showAverageRuntime().showAverageThroughput();
   });
-  
+
   perfContext('TypedArray no recycling', () => {
     let terminal: TestTerminal;
     before(() => {
