@@ -40,7 +40,7 @@ perfContext('Terminal: ls -lR /usr/lib', () => {
         rows: 25,
         scrollback: 1000,
         experimentalBufferLineImpl: 'JSArray',
-        experimentalPushRecycling: false
+        experimentalBufferLineRecycling: false
       });
     });
     new ThroughputRuntimeCase('', () => {
@@ -57,7 +57,7 @@ perfContext('Terminal: ls -lR /usr/lib', () => {
         rows: 25,
         scrollback: 1000,
         experimentalBufferLineImpl: 'JSArray',
-        experimentalPushRecycling: true
+        experimentalBufferLineRecycling: true
       });
     });
     new ThroughputRuntimeCase('', () => {
@@ -74,7 +74,7 @@ perfContext('Terminal: ls -lR /usr/lib', () => {
         rows: 25,
         scrollback: 1000,
         experimentalBufferLineImpl: 'TypedArray',
-        experimentalPushRecycling: false
+        experimentalBufferLineRecycling: false
       });
     });
     new ThroughputRuntimeCase('', () => {
@@ -91,7 +91,7 @@ perfContext('Terminal: ls -lR /usr/lib', () => {
         rows: 25,
         scrollback: 1000,
         experimentalBufferLineImpl: 'TypedArray',
-        experimentalPushRecycling: true
+        experimentalBufferLineRecycling: true
       });
     });
     new ThroughputRuntimeCase('', () => {
