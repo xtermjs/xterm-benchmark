@@ -68,7 +68,7 @@ async function main(): Promise<void> {
      * The output format is newline delimited json.
      * Useful for post processing results by piping.
      */
-    .option('-j, --json', 'outputs NL delimited json to stdout, equals "-S -l /dev/stdout"')
+    .option('-j, --json', 'output json to stdout, equals "-S -l /dev/stdout"')
 
     /**
      * --full
@@ -93,7 +93,7 @@ async function main(): Promise<void> {
      * run (--eval) will be tested against this baseline.
      * Note that any report from a previous run can act
      * as a baseline (see --against), this switch is merely
-     * a convenient shortcut and will stores the report data
+     * a convenient shortcut and will store the report data
      * under <APP_PATH>/baseline.log. Later calls with
      * --baseline will override this baseline.
      */

@@ -29,7 +29,7 @@ export function mapObjectValues(obj: any, fn: Function) {
 }
 
 /**
- * Generate a function to mutate deeply nested data structures.
+ * Generate a function to extract/alter deeply nested data structures.
  * Takes a list of predefined symbols or custom functions,
  * and returns a function to be applied to the data.
  * Custom functions should accept two arguments, the first
@@ -54,7 +54,8 @@ export function mapObjectValues(obj: any, fn: Function) {
  * --> [ 11, 12, 13 ]
  * reshapeFn([':flatten'])(reshapeFn([':index', 'b'])(EXAMPLE));
  * --> [ 1, 2, 3, 4, 5, 6, 7, 8, 9 ]
- * reshapeFn([':index', ':keys', (el: any, fn: Function) => fn((el instanceof Array) ? el.map(n => ++n) : ++el) ])(EXAMPLE);
+ * reshapeFn([':index', ':keys',
+ *   (el: any, fn: Function) => fn((el instanceof Array) ? el.map(n => ++n) : ++el)])(EXAMPLE);
  * --> [ { a: 12, b: [ 2, 3, 4 ] },
  *   { a: 13, b: [ 5, 6, 7 ] },
  *   { a: 14, b: [ 8, 9, 10 ] } ]
