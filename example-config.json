@@ -1,0 +1,17 @@
+{
+  "APP_PATH": "benchmark",
+  "defaultOptions": {
+    "fork": false,
+    "repeat": 2
+  },
+  "evalConfig": {
+    "tolerance": {
+      "*": [0.5, 2.0],
+      "examples/test1.perf.js|mixins in JS#customWithSubs.sub2.subsub.mean": [0.1, 50.0]
+    },
+    "skip": [
+      "*.median",
+      "examples/test1.perf.js|mixins in JS#customWithSubs.sub2.subsub.runs"
+    ]
+  } 
+}
