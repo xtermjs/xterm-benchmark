@@ -1,7 +1,8 @@
 import { perfContext, before, beforeEach, ThroughputRuntimeCase } from '..';
 
+import * as xterm from 'xterm';
 import { EscapeSequenceParser } from 'xterm/src/EscapeSequenceParser';
-const Parser: typeof EscapeSequenceParser = require('xterm/lib/EscapeSequenceParser').EscapeSequenceParser;
+const Parser = require('xterm/lib/EscapeSequenceParser').EscapeSequenceParser;
 const C0 = require('xterm/lib/common/data/EscapeSequences').C0;
 const C1 = require('xterm/lib/common/data/EscapeSequences').C1;
 

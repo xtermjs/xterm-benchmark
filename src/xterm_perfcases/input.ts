@@ -1,7 +1,8 @@
 import { perfContext, before, ThroughputRuntimeCase } from '..';
 
-import { Terminal as TerminalType } from 'xterm/src/Terminal';
-const Terminal: typeof TerminalType = require('xterm/lib/Terminal').Terminal;
+//import * as xterm from 'xterm';
+import { Terminal } from 'xterm/src/Terminal';
+//const Terminal: typeof TerminalType = require('xterm/lib/Terminal').Terminal;
 const pty = require('xterm/node_modules/node-pty');
 
 class TestTerminal extends Terminal {
@@ -39,7 +40,7 @@ perfContext('Terminal: ls -lR /usr/lib', () => {
         cols: 80,
         rows: 25,
         scrollback: 1000,
-        experimentalBufferLineImpl: 'JSArray',
+        experimentalBufferLineImpl: 'JsArray',
         experimentalBufferLineRecycling: false
       });
     });
@@ -56,7 +57,7 @@ perfContext('Terminal: ls -lR /usr/lib', () => {
         cols: 80,
         rows: 25,
         scrollback: 1000,
-        experimentalBufferLineImpl: 'JSArray',
+        experimentalBufferLineImpl: 'JsArray',
         experimentalBufferLineRecycling: true
       });
     });
