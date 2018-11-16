@@ -29,7 +29,7 @@
     "@types/mocha": "^5.2.5",
     "@types/node": "^10.11.7",
     "app-root-path": "^2.1.0",
-    "chrome-timeline": "0.0.10",
+    "chrome-timeline": "0.0.11",
     "cli-table": "^0.3.1",
     "columnify": "^1.5.4",
     "commander": "^2.19.0",
