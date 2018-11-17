@@ -39,8 +39,7 @@ Options:
 ### Running Example Perf Case
 - cd xterm-benchmark && npm install (If this throws puppeteer error then try deleting the whole puppeteer folder before doing npm install again.)
 - npm run tsc ( Compiles ts files into js files which can be found under ./lib folder)
-- node lib/cli.js lib/src/xterm_perfcases/parser.ts ( New perf case files should be under src/xterm_perfcases )
-
+- node lib/cli.js lib/xterm_perfcases/parser.js ( node lib/cli.js <path-to-js-perfcase-file>)
 
 ### Configuration
 
