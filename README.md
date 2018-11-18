@@ -36,6 +36,11 @@ Options:
 - run a set of files to create the baseline data, e.g. `xterm-benchmark some_files* -b`
 - after code changes run the same set of files against the baseline, e.g. `xterm-benchmark some_files* -e`
 
+### Running Example Perf Case
+- cd xterm-benchmark && npm install (If this throws puppeteer error then try deleting the whole puppeteer folder before doing npm install again.)
+- npm run tsc ( Compiles ts files into js files which can be found under ./lib folder)
+- node lib/cli.js lib/xterm_perfcases/parser.js ( node lib/cli.js <path-to-js-perfcase-file>)
+
 ### Configuration
 
 The config file currently supports the following settings:
