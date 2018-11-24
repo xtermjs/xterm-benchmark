@@ -33,15 +33,14 @@ perfContext('Terminal: ls -lR /usr/lib', () => {
     }
   });
 
-  perfContext('JSArray no recycling', () => {
+  perfContext('JSArray', () => {
     let terminal: TestTerminal;
     before(() => {
       terminal = new TestTerminal({
         cols: 80,
         rows: 25,
         scrollback: 1000,
-        experimentalBufferLineImpl: 'JsArray',
-        experimentalBufferLineRecycling: false
+        experimentalBufferLineImpl: 'JsArray'
       });
     });
     new ThroughputRuntimeCase('', () => {
@@ -50,49 +49,14 @@ perfContext('Terminal: ls -lR /usr/lib', () => {
     }, {fork: true}).showRuntime().showThroughput().showAverageRuntime().showAverageThroughput();
   });
 
-  perfContext('JSArray with recycling', () => {
+  perfContext('TypedArray', () => {
     let terminal: TestTerminal;
     before(() => {
       terminal = new TestTerminal({
         cols: 80,
         rows: 25,
         scrollback: 1000,
-        experimentalBufferLineImpl: 'JsArray',
-        experimentalBufferLineRecycling: true
-      });
-    });
-    new ThroughputRuntimeCase('', () => {
-      terminal.writeSync(content);
-      return {payloadSize: content.length};
-    }, {fork: true}).showRuntime().showThroughput().showAverageRuntime().showAverageThroughput();
-  });
-
-  perfContext('TypedArray no recycling', () => {
-    let terminal: TestTerminal;
-    before(() => {
-      terminal = new TestTerminal({
-        cols: 80,
-        rows: 25,
-        scrollback: 1000,
-        experimentalBufferLineImpl: 'TypedArray',
-        experimentalBufferLineRecycling: false
-      });
-    });
-    new ThroughputRuntimeCase('', () => {
-      terminal.writeSync(content);
-      return {payloadSize: content.length};
-    }, {fork: true}).showRuntime().showThroughput().showAverageRuntime().showAverageThroughput();
-  });
-
-  perfContext('TypedArray with recycling', () => {
-    let terminal: TestTerminal;
-    before(() => {
-      terminal = new TestTerminal({
-        cols: 80,
-        rows: 25,
-        scrollback: 1000,
-        experimentalBufferLineImpl: 'TypedArray',
-        experimentalBufferLineRecycling: true
+        experimentalBufferLineImpl: 'TypedArray'
       });
     });
     new ThroughputRuntimeCase('', () => {

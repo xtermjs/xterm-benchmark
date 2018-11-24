@@ -36,7 +36,6 @@ new TimelineRuntime('timeline', async (runner: TimelineRunner) => {
   await runner.sleep(1000);
   await runner.tracingStart('LS_INPUT');
   await runner.remote((done: () => void, window: Window) => {
-    (window as any).term.setOption('experimentalBufferLineRecycling', true);
     (window as any).term.setOption('experimentalBufferLineImpl', 'TypedArray');
     (window as any).term._core.handler('ls -lR /usr/lib\r');
     setTimeout(done, 3000);
