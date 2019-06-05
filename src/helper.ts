@@ -2,7 +2,7 @@ import * as math from 'mathjs';
 
 // zip a..n --> [[a.0 .. n.0] .. [a.X .. n.X]]
 export function zip(...args: any[]) {
-  const names = new Set();
+  const names = new Set<string>();
   for (const argc of args) {
     for (const name in argc) {
       if (name === 'length') {

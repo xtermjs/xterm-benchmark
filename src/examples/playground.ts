@@ -7,7 +7,7 @@ function bashspawn(command: string): ChildProcess {
   return spawn('sh', ['-c', command], { stdio: ['ignore', 'ignore', 'inherit'], detached: true });
 }
 
-let child: ChildProcess = null;
+let child: ChildProcess;
 
 before(async () => {
   child = bashspawn('cd ../xterm.js && npm start');
@@ -32,6 +32,9 @@ after(killChild);
 
 const TimelineRuntime = ExtractFromTimeline(TimelinePerfCase);
 new TimelineRuntime('timeline', async (runner: TimelineRunner) => {
+  if (!runner.page) {
+    return;
+  }
   await runner.page.goto('http://localhost:3000', {waitUntil: 'networkidle2'});
   await runner.sleep(1000);
   await runner.tracingStart('TRACE_ABC');

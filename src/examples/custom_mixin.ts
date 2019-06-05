@@ -18,7 +18,7 @@ function GreeterMixin<TBase extends PerfCaseConstructor>(Base: TBase) {
     // optional processing for every single result
     // that can be called later on the perf case
     public greet(): this {
-      return this.postEach((result: IGreetResult): void => {
+      return this.postEach((result: IGreetResult): void | null => {
         if (result.greet) {
           console.log(`${this.getIndent()}Hi there from "${this.name}"!`);
           return;
@@ -32,6 +32,9 @@ function GreeterMixin<TBase extends PerfCaseConstructor>(Base: TBase) {
     // here: print some log and collect data in summary
     public greetingSummary(): this {
       return this.postAll((results: IGreetResult[]): void => {
+        if (!this.options || !this.options.repeat) {
+          return;
+        }
         const grumpyRuns = this.options.repeat - results.length;
         console.log(`${this.getIndent()}${results.length} greetings received. (${grumpyRuns} being grumpy)`);
         this.summary['greetingsRatio'] = results.length / this.options.repeat;
