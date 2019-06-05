@@ -25,7 +25,7 @@ export interface IStackToken {
 export interface IPerfCase extends IStackToken {
   summary: { [key: string]: any };
   path: string[] | null;
-  postEach(callback: (result: ICaseResult) => ICaseResult | void, perfCase?: this): this;
+  postEach(callback: (result: ICaseResult) => ICaseResult | void | null, perfCase?: this): this;
   postAll(callback: (results: ICaseResult[]) => ICaseResult[] | void, perfCase?: this): this;
   run(parentPath: string[], forked: boolean): Promise<void>;
   getIndent(): string;
@@ -35,7 +35,7 @@ export interface IPerfCase extends IStackToken {
 export interface ICaseResult {
   name: string;
   path: string[];
-  runtime: number[] | undefined;
+  runtime: number[];
   returnValue: any;
   run: number;
   repeat: number;

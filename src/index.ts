@@ -139,10 +139,6 @@ class PerfContext {
     return this.getPath().join('|');
   }
 
-  public getRoot(): string {
-    return this.getPath().shift();
-  }
-
   public async runFull(): Promise<void> {
     console.log(`${INDENT.repeat(this.getPath().length)}Context "${this.name}"`);
     try {
@@ -272,17 +268,17 @@ class PerfContext {
  */
 export class PerfCase implements IPerfCase {
   public type: PerfType = PerfType.PerfCase;
-  private _single: ((result: ICaseResult, perfCase: this) => ICaseResult | void)[] = [];
+  private _single: ((result: ICaseResult, perfCase: this) => ICaseResult | void | null)[] = [];
   private _all: ((result: ICaseResult[], perfCase: this) => ICaseResult[] | void)[] = [];
   public options: IPerfOptions;
   public results: ICaseResult[] = [];
   public summary: { [key: string]: any } = {};
-  public path: string[] | null = null;
+  public path: string[] = [];
   constructor(public name: string, public callback: (...args: any[]) => void, opts?: IPerfOptions) {
     this.options = Object.assign({}, DEFAULT_OPTIONS, opts, CMDLINE_OVERRIDES);
     addToStack(this);
   }
-  public postEach(callback: (result: ICaseResult, perfCase: this) => ICaseResult | void): this {
+  public postEach(callback: (result: ICaseResult, perfCase: this) => ICaseResult | void | null): this {
     this._single.push(callback);
     return this;
   }
@@ -335,6 +331,9 @@ export class PerfCase implements IPerfCase {
         p.on('exit', _ => resolve());
       });
     } else {
+      if (!this.options.repeat) {
+        return;
+      }
       for (let repeat = 0; repeat < this.options.repeat; ++repeat) {
         const start = process.hrtime();
         const returnValue = await this.callback();
@@ -347,7 +346,7 @@ export class PerfCase implements IPerfCase {
           run: repeat + 1,
           repeat: this.options.repeat
         };
-        if (forked) {
+        if (forked && process.send) {
           process.send(result);
         } else {
           await this._processSingle(result);
@@ -380,6 +379,9 @@ export class TimelinePerfCase extends PerfCase {
   // also disable fork variant
   public async run(parentPath: string[], _: boolean = false): Promise<void> {
     this.path = parentPath.concat(this.name);
+    if (!this.options.repeat) {
+      return;
+    }
     for (let repeat = 0; repeat < this.options.repeat; ++repeat) {
       const runner = new TimelineRunner();
       await runner.start();
@@ -463,6 +465,9 @@ export type ThroughputRuntimeCaseType = InstanceType<typeof ThroughputRuntimeCas
 export async function run(treePath: string[]): Promise<void> {
   while (STACK.pop()) { }
   const filename = treePath.shift();
+  if (!filename) {
+    return;
+  }
   require(path.resolve(filename));
   const ctx = new PerfContext(filename, null);
   await ctx.runSingle(treePath);
@@ -613,7 +618,7 @@ export function showBaselineData(basePath: string) {
 /**
  * Expand baselineData with eval data and do the eval within the tolerances.
  */
-function applyEval(baselineEntries: IBaselineEntry[], evalEntries: IBaselineEntry[], treePath: string, dataPath: string, stats: IEvalStatsSummary): void {
+function applyEval(baselineEntries: IBaselineEntry[], evalEntries: IBaselineEntry[] | undefined, treePath: string, dataPath: string, stats: IEvalStatsSummary): void {
   baselineEntries.forEach((el, idx) => {
     el.tolerance = getTolerance(treePath, dataPath + '.' + el.stat);
     el.value = (evalEntries && evalEntries[idx]) ? evalEntries[idx].base : undefined;

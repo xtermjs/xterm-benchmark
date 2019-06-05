@@ -9,6 +9,7 @@ import { reshapeFn, descriptiveStats } from './helper';
  // ctor base
 export type PerfCaseConstructor<T = IPerfCase> = new (...args: any[]) => T;
 
+
 /**
  * Runtime mixin for PerfCase.
  * Appends `averageRuntime` to summary.
