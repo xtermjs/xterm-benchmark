@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import * as commander from 'commander';
 import { run, showTree, CMDLINE_OVERRIDES, LOGPATHS, showBaselineData, EVAL_CONFIG, DEFAULT_OPTIONS, evalRun } from './index';
 import { ICmdlineOverrides, ReportType } from './interfaces';

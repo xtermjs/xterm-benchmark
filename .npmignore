@@ -1,0 +1,6 @@
+/.vscode/
+/timeline/
+/benchmark/
+/node_modules/
+# dont lock for now
+/package-lock.json
