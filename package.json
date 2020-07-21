@@ -26,17 +26,17 @@
   "dependencies": {
     "@types/app-root-path": "^1.2.4",
     "@types/cli-table": "^0.3.0",
-    "@types/mathjs": "^5.0.1",
-    "@types/mocha": "^5.2.7",
-    "@types/node": "^12.0.4",
-    "app-root-path": "^2.2.1",
-    "chrome-timeline": "0.0.12",
+    "@types/mathjs": "^6.0.5",
+    "@types/mocha": "^8.0.0",
+    "@types/node": "^12.12.37",
+    "app-root-path": "^3.0.0",
+    "chrome-timeline": "0.0.13",
     "cli-table": "^0.3.1",
     "columnify": "^1.5.4",
-    "commander": "^2.20.0",
-    "mathjs": "^5.10.3",
-    "mocha": "^6.1.4",
-    "tslint": "^5.17.0",
-    "typescript": "^3.5.1"
+    "commander": "^6.0.0",
+    "mathjs": "^7.1.0",
+    "mocha": "^8.0.1",
+    "tslint": "^6.1.2",
+    "typescript": "^3.9.7"
   }
 }
