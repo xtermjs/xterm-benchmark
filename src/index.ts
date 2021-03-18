@@ -326,7 +326,7 @@ export class PerfCase implements IPerfCase {
     if (this.options.fork && !forked) {
       const p = fork(path.join(module.filename), this.options.forkArgs || [], this.options.forkOptions);
       p.send({ case: this.path, cmdlineOverrides: CMDLINE_OVERRIDES });
-      await new Promise(resolve => {
+      await new Promise<void>(resolve => {
         p.on('message', (result: ICaseResult) => this._processSingle(result));
         p.on('exit', _ => resolve());
       });
