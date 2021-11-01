@@ -4,9 +4,7 @@ Library to create and run automated performance test cases.
 
 ### Current state
 
-The library and the cmdline tool are in pre alpha state and likely to see heavy API changes.
-It is currently developed and hardlinked to xterm.js, to work properly this repo should be
-checked out next to an existing xterm.js repo folder.
+The library and the cmdline tool are in alpha state and likely to see heavy API changes.
 
 ### Cmdline options
 ```
@@ -66,7 +64,6 @@ To keep it highly customizable, `PerfCase` can be extended by mixins (see `src/e
 The library comes with several predefined perf case classes:
 - RuntimeCase: contains mixin for runtime reports
 - ThroughputRuntimeCase: contains runtime and throughput mixins
-- TimelinePerfCase: base class for puppeteer based perf cases (TODO: merge with extract mixin)
 
 A simple runtime reporting perf case would look like this:
 ```TS
@@ -128,3 +125,9 @@ are relative to the baseline value, currently it is not possible to set absolute
   - median: should not be used by default, still can be useful if the value clearly shows non normal distribution
   to still get some comparison running (example: due to ongoing JIT optimization some values might show a decreasing runtime over several runs, others might get worse due to heavier GC invocation)
 - Unwanted values for evaluation can be skipped in the config file.
+
+
+### Version notes
+
+- 0.3.0 removes the dependency to the `chrome-timeline` package, thus `TimelinePerfCase` is not defined anymore.
+  If your perf cases rely on frontend performance testing with that type, either use an older version, or feel free to help upgrading `chrome-timeline` to support newer browser engines as well.
