@@ -1,6 +1,6 @@
 {
   "name": "xterm-benchmark",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "A benchmark tool for measuring performance in xterm.js",
   "main": "./lib/index.js",
   "scripts": {
@@ -31,7 +31,6 @@
     "@types/node": "^12.12.37",
     "@types/puppeteer": "^5.4.3",
     "app-root-path": "^3.0.0",
-    "chrome-timeline": "0.0.15",
     "cli-table": "^0.3.6",
     "columnify": "^1.5.4",
     "commander": "^6.2.1",

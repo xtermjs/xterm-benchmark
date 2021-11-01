@@ -9,7 +9,6 @@ import { IPerfOptions, ICmdlineOverrides, IStackToken, PerfType, IPerfTree, IPer
 import * as path from 'path';
 import { fork } from 'child_process';
 import { Runtime, Throughput } from './mixins';
-import { TimelineRunner } from 'chrome-timeline';
 import * as fs from 'fs';
 import { mapObjectValues } from './helper';
 const columnify: (data: any, config: any) => string = require('columnify');
@@ -360,52 +359,6 @@ export class PerfCase implements IPerfCase {
   }
   public getIndent(): string {
     return INDENT.repeat(this.path.length);
-  }
-}
-
-/**
- * TimelinePerfCase
- *
- * Derived PerfCase to do puppeteer based runtime tracing.
- * Runs the callback in a TimelineRunner from chrome-timeline.
- * The callback gets the runner instance as argument.
- * Returns the trace summaries in `result.returnValue`.
- *
- * Options: TODO...
- */
-export class TimelinePerfCase extends PerfCase {
-  // override run to call into chrome-timeline
-  // since the tests are meant for remote anyways
-  // also disable fork variant
-  public async run(parentPath: string[], _: boolean = false): Promise<void> {
-    this.path = parentPath.concat(this.name);
-    if (!this.options.repeat) {
-      return;
-    }
-    for (let repeat = 0; repeat < this.options.repeat; ++repeat) {
-      const runner = new TimelineRunner();
-      await runner.start();
-      let start;
-      let runtime;
-      try {
-        start = process.hrtime();
-        await runner.run(this.callback);
-      } finally {
-        runtime = process.hrtime(start);
-        await runner.end();
-      }
-      const result: ICaseResult = {
-        name: this.name,
-        path: this.path,
-        runtime,
-        returnValue: runner.traceSummaries,
-        run: repeat + 1,
-        repeat: this.options.repeat
-      };
-      await this._processSingle(result);
-    }
-    await this._processFinal();
-    await this._reportResults();
   }
 }
 
