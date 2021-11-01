@@ -31,7 +31,6 @@
     "@types/node": "^12.12.37",
     "@types/puppeteer": "^5.4.3",
     "app-root-path": "^3.0.0",
-    "chrome-timeline": "0.0.15",
     "cli-table": "^0.3.6",
     "columnify": "^1.5.4",
     "commander": "^6.2.1",
