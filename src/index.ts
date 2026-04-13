@@ -641,7 +641,7 @@ export function evalRun(basePath: string, evalPath: string): IEvalStats {
  */
 if (require.main === module) {
   if (process.send) {
-    process.on('message', async msg => {
+    process.on('message', async (msg: any) => {
       Object.assign(CMDLINE_OVERRIDES, msg.cmdlineOverrides);
       const filename = msg.case.shift();
       require(path.resolve(filename));
