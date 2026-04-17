@@ -22,17 +22,19 @@
   },
   "homepage": "https://github.com/xtermjs/xterm-benchmark#readme",
   "dependencies": {
+    "app-root-path": "^3.1.0",
+    "cli-table": "^0.3.11",
+    "columnify": "^1.6.0",
+    "commander": "^6.2.1",
+    "mathjs": "^15.2.0"
+  },
+  "devDependencies": {
     "@types/app-root-path": "^1.2.8",
     "@types/cli-table": "^0.3.4",
     "@types/mathjs": "^9.4.1",
     "@types/mocha": "^10.0.10",
     "@types/node": "^24",
     "@types/puppeteer": "^5.4.7",
-    "app-root-path": "^3.1.0",
-    "cli-table": "^0.3.11",
-    "columnify": "^1.6.0",
-    "commander": "^6.2.1",
-    "mathjs": "^15.2.0",
     "typescript": "^5.9.0"
   }
 }
