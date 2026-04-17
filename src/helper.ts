@@ -86,9 +86,9 @@ export function reshapeFn(symbols: any[]): (data: any) => any {
 
 // rudimentary descriptive statistics
 export function descriptiveStats(array: number[] | number[][] | math.Matrix) {
-  const mean = math.mean(array);
+  const mean = math.mean(array) as number;
   const median = math.median(array);
-  const dev = math.std(array);
+  const dev = math.std(array) as unknown as number;
   const cv = dev / mean;
   return {mean, median, dev, cv};
 }
